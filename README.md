@@ -161,16 +161,8 @@ Needs container query units (`cqw`): Chrome 105+, Safari 16+, Firefox 110+.
 
 ## Releases
 
-Releases use [just-github-actions-n-workflows](https://github.com/justAnArthur/just-github-actions-n-workflows)
-(`bump-version` + `publish-npm-on-tag`). Commits with the `avatar` or `lib` scope bump the version on push
-to `main`: `fix(avatar): …` → patch, `feat(avatar): …` → minor. The bump pushes a
-`@justanarthur/just-ai-avatar@x.y.z` tag, and `publish-npm-on-tag` builds and publishes it to npm and creates
-the GitHub release. It needs an `NPM_TOKEN` repository secret.
-
-Tags pushed with the default `GITHUB_TOKEN` don't start other workflows, so `publish-bumped-tags.yml` runs
-after each `bump-version` and dispatches `publish-npm-on-tag` for the tags that run created. To publish a
-past bump, run it by hand with the commit the bump ran on:
-
-```bash
-gh workflow run publish-bumped-tags.yml -f head_sha=<commit>
-```
+Releases use [just-github-actions-n-workflows](https://github.com/justAnArthur/just-github-actions-n-workflows):
+`bump-version`, `publish-npm-on-tag` and `release-on-tag`. Commits scoped `avatar` or `lib` bump the version on
+push to `main` (`fix(avatar): …` → patch, `feat(avatar): …` → minor). The bump tags
+`@justanarthur/just-ai-avatar@x.y.z` and starts the tag workflows itself, which publish to npm and create the
+GitHub release. Publishing needs an `NPM_TOKEN` repository secret.
