@@ -1,6 +1,6 @@
 {
   "name": "@justanarthur/just-ai-avatar",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "AI avatars in glow, flat, plush and clay looks, with accessories and animated moods, as a Preact component",
   "license": "MIT",
   "repository": {
