@@ -4,6 +4,12 @@ Glowing AI avatars in plain HTML + CSS, as a Preact component. No images, no SVG
 every part is a div with inline styles, so it also renders to static HTML.
 
 ```bash
+bun add @justanarthur/just-ai-avatar preact
+```
+
+Develop:
+
+```bash
 bun install
 bun run dev        # playground at http://localhost:3000
 bun test
@@ -25,7 +31,7 @@ The CLI puts some files in `src/components/ui`; move them to `playground/compone
 ## Use
 
 ```tsx
-import { Avatar } from 'just-ai-avatar';
+import { Avatar } from '@justanarthur/just-ai-avatar';
 
 <Avatar seed="agent-42" size={96} />                      // same seed → same avatar
 <Avatar body="hexagon" eyes="wink" palette="grape" animate={['blink', 'float']} />
@@ -35,7 +41,7 @@ import { Avatar } from 'just-ai-avatar';
 Static HTML (SSR, emails, static sites):
 
 ```ts
-import { renderAvatarHTML } from 'just-ai-avatar/server';
+import { renderAvatarHTML } from '@justanarthur/just-ai-avatar/server';
 const html = renderAvatarHTML({ seed: 'bob', size: 64 });
 ```
 
@@ -43,11 +49,32 @@ Without JSX, as a web component:
 
 ```html
 <script type="module">
-  import { defineAvatarElement } from 'just-ai-avatar/element';
+  import { defineAvatarElement } from '@justanarthur/just-ai-avatar/element';
   defineAvatarElement();
 </script>
 <ai-avatar seed="agent-42" body="triangle" eyes="oval happy" animate="blink"></ai-avatar>
 ```
+
+## Export: SVG, PNG, JPEG
+
+`renderAvatarSVG` draws the same avatar as real vector shapes (paths, gradients, blur filters, hex colors
+only), so the file opens in Figma, Illustrator and Inkscape. It works on the server too.
+
+```ts
+import { renderAvatarSVG } from '@justanarthur/just-ai-avatar';
+const svg = renderAvatarSVG({ seed: 'bob', size: 512 });
+```
+
+In the browser, PNG and JPEG are rendered from that SVG onto a canvas:
+
+```ts
+import { avatarToBlob, downloadAvatar } from '@justanarthur/just-ai-avatar/export';
+
+const png = await avatarToBlob({ seed: 'bob' }, { format: 'png', size: 1024 });
+await downloadAvatar({ seed: 'bob' }, { format: 'jpeg', size: 512, background: '#fff', filename: 'bob' });
+```
+
+JPEG has no transparency, so the tile's rounded corners are filled with `background`.
 
 ## Options
 
@@ -88,3 +115,11 @@ pentagon: {
 ```
 
 Needs container query units (`cqw`): Chrome 105+, Safari 16+, Firefox 110+.
+
+## Releases
+
+Releases use [just-github-actions-n-workflows](https://github.com/justAnArthur/just-github-actions-n-workflows)
+(`bump-version` + `publish-npm-on-tag`). Commits with the `avatar` or `lib` scope bump the version on push
+to `main`: `fix(avatar): …` → patch, `feat(avatar): …` → minor. The bump pushes a
+`@justanarthur/just-ai-avatar@x.y.z` tag, and `publish-npm-on-tag` builds and publishes it to npm and creates
+the GitHub release. It needs an `NPM_TOKEN` repository secret.

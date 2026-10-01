@@ -1,23 +1,57 @@
 {
-  "name": "just-ai-avatar",
+  "name": "@justanarthur/just-ai-avatar",
   "version": "0.2.0",
   "description": "Glowing AI avatars in plain HTML + CSS, as a Preact component",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/justAnArthur/just-ai-avatar.git"
+  },
+  "homepage": "https://github.com/justAnArthur/just-ai-avatar#readme",
+  "keywords": [
+    "avatar",
+    "ai",
+    "preact",
+    "css",
+    "svg",
+    "generator"
+  ],
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./server": "./src/server.ts",
-    "./element": "./src/element.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./element": {
+      "types": "./dist/element.d.ts",
+      "import": "./dist/element.js"
+    },
+    "./export": {
+      "types": "./dist/export.d.ts",
+      "import": "./dist/export.js"
+    }
   },
   "files": [
+    "dist",
     "src",
-    "dist"
+    "README.md"
   ],
+  "sideEffects": false,
   "scripts": {
     "dev": "bun --hot ./playground/index.html",
-    "build": "bun build ./src/index.ts ./src/server.ts ./src/element.ts --outdir dist --splitting --target browser --external preact --external preact-render-to-string --minify",
+    "build": "rm -rf dist && bun build ./src/index.ts ./src/server.ts ./src/element.ts ./src/export.ts --outdir dist --splitting --target browser --external preact --external preact-render-to-string --minify && tsc -p tsconfig.build.json && bun scripts/fix-dts.ts",
     "build:playground": "bun scripts/build-playground.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
+  },
+  "properties": {
+    "gitCommitScopeRelatedNames": "avatar,lib"
   },
   "peerDependencies": {
     "preact": "^11.0.0"
