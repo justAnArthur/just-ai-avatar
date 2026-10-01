@@ -4,7 +4,7 @@ import { EMOTION_KEYFRAMES, type Part, cutPolygon, partTransform } from './emoti
 import { layout } from './layout.ts';
 import { ok } from './looks.ts';
 import { type AvatarOptions, rngFromSeed } from './options.ts';
-import { accessoryNodes, sceneNodes } from './scene.ts';
+import { accessoryNodes, sceneLayers } from './scene.ts';
 import { type Box, shapeStyle } from './shapes.ts';
 import { type Node, toVNode } from './tree.ts';
 
@@ -67,15 +67,18 @@ export const Avatar = ({ class: className, style, emotionKey, ...options }: Avat
 
   if (o.look !== 'glow') {
     const [top, bottom] = L.paint.bg;
+    const [back, face, front] = sceneLayers(L, { id, animate: o.animate, emKey });
+    // the still layers get their own compositing layer, so blinking doesn't re-run their filters
+    const svg = (nodes: Node[], still: boolean) => (
+      <svg viewBox="0 0 100 100" aria-hidden="true" style={{ ...cover, width: '100%', height: '100%', overflow: 'visible', willChange: still && o.animate ? 'transform' : undefined }}>
+        {nodes.map(toVNode)}
+      </svg>
+    );
     return (
       <>
         {keyframes}
         <div class={classes} role="img" aria-label={o.label} style={frame(L.hasBackground ? `linear-gradient(180deg,${ok(top)},${ok(bottom)})` : 'transparent')}>
-          {moving(
-            <svg viewBox="0 0 100 100" aria-hidden="true" style={{ ...cover, width: '100%', height: '100%', overflow: 'visible' }}>
-              {sceneNodes(L, { id, animate: o.animate, emKey, backdrop: false }).map(toVNode)}
-            </svg>,
-          )}
+          {moving(<>{svg(back, true)}{svg(face, false)}{svg(front, true)}</>)}
         </div>
       </>
     );

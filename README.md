@@ -64,9 +64,12 @@ Without JSX, as a web component:
 | Look | |
 |---|---|
 | `glow` | the original: a light-filled body cropped by a gradient tile, glowing eyes |
-| `flat` | solid shapes, crisp edges, simple eyes |
-| `plush` | felt toy: fuzzy edge and pile from SVG noise, soft shading, glossy black eyes |
-| `clay` | lit from the top left, soft inner shadow, specular highlight |
+| `flat` | solid shapes, crisp edges, one flat-shading crescent, simple eyes |
+| `plush` | felt toy: fuzzy silhouette with light-catching fibers, soft pile, deep shading, glossy bead eyes in sockets |
+| `clay` | smooth and glossy: soft far-side shadow, crisp rim light, specular highlight, bead eyes |
+
+Textures are measured in tile units, so a look renders the same at any size; the plush pile gets coarser and
+quieter on small avatars so it reads as fur, not glitter. Hats and glasses cast a soft shadow in plush and clay.
 
 Accessories go one per slot and are drawn in the avatar's look (felt in plush, lit in clay, glowing in glow):
 

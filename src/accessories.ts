@@ -171,11 +171,12 @@ export const ACCESSORIES = {
     build: (a) => {
       const { l, r, gap, rot, spin } = eyePair(a);
       const rx = Math.min(Math.max(l.w, r.w) * 0.85, gap * 0.48);
-      const ry = Math.max(l.h, r.h) * 0.6;
-      const lens = `M${n(-rx)} ${n(-ry * 0.75)}H${n(rx)}C${n(rx)} ${n(ry * 0.6)} ${n(rx * 0.5)} ${n(ry)} 0 ${n(ry)}C${n(-rx * 0.5)} ${n(ry)} ${n(-rx)} ${n(ry * 0.6)} ${n(-rx)} ${n(-ry * 0.75)}Z`;
-      const shine = `M${n(-rx * 0.55)} ${n(-ry * 0.35)}L${n(-rx * 0.15)} ${n(-ry * 0.55)}L${n(-rx * 0.05)} ${n(-ry * 0.3)}L${n(-rx * 0.5)} ${n(-ry * 0.05)}Z`;
-      const [lx, ly] = spin(rx - a.s, -ry * 0.6);
-      const [rx2, ry2] = spin(-rx + a.s, -ry * 0.6);
+      const ry = Math.max(l.h, r.h) * 0.62;
+      const top = -ry * 0.92;
+      const lens = `M${n(-rx)} ${n(top)}H${n(rx)}C${n(rx)} ${n(ry * 0.65)} ${n(rx * 0.5)} ${n(ry * 1.05)} 0 ${n(ry * 1.05)}C${n(-rx * 0.5)} ${n(ry * 1.05)} ${n(-rx)} ${n(ry * 0.65)} ${n(-rx)} ${n(top)}Z`;
+      const shine = `M${n(-rx * 0.55)} ${n(top * 0.45)}L${n(-rx * 0.15)} ${n(top * 0.7)}L${n(-rx * 0.05)} ${n(top * 0.4)}L${n(-rx * 0.5)} ${n(top * 0.08)}Z`;
+      const [lx, ly] = spin(rx - a.s, top + a.s);
+      const [rx2, ry2] = spin(-rx + a.s, top + a.s);
       return [
         ...[l, r].flatMap((e): Piece[] => [
           { d: lens, role: 'lens', at: { x: e.cx, y: e.cy, rotate: rot } },

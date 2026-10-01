@@ -2,6 +2,7 @@ import type { Piece } from './accessories.ts';
 import { type EyeMod, cutPolygon, partTransform } from './emotions.ts';
 import type { Layout } from './layout.ts';
 import { type LookName, type Role, type Tone, ok, shade } from './looks.ts';
+import { blurFilter, castFilter, clayFilter, feltFilter, reliefStops } from './materials.ts';
 import { rngFromSeed } from './options.ts';
 import { radiusPath, shapePath } from './shapes.ts';
 import { type Node, el } from './tree.ts';
@@ -12,14 +13,11 @@ export type SceneOptions = {
   animate?: boolean;
   /** Changes when an emotion replays, so its pop-in animations restart. */
   emKey?: string;
-  /** Tile background and crop; the live avatar leaves them, and the float, to its HTML frame. */
-  backdrop?: boolean;
 };
 
-type Ctx = Required<SceneOptions> & { L: Layout; look: LookName; delay: string; defs: Node[]; seen: Set<string> };
+type Ctx = Required<SceneOptions> & { L: Layout; look: LookName; delay: string; detail: number; defs: Node[]; seen: Set<string> };
 
 const f = (n: number) => +n.toFixed(3);
-const FELT: Role[] = ['fill', 'trim', 'leaf'];
 const EASE_BACK = 'cubic-bezier(.3,1.4,.5,1)';
 
 function def(c: Ctx, key: string, make: (id: string) => Node): string {
@@ -33,8 +31,10 @@ function def(c: Ctx, key: string, make: (id: string) => Node): string {
 
 function context(L: Layout, o: SceneOptions): Ctx {
   return {
-    animate: false, emKey: 'calm', backdrop: true, ...o,
+    animate: false, emKey: 'calm', ...o,
     L, look: L.options.look, delay: `${f(rngFromSeed(L.options.seedKey)() * 4)}s`, defs: [], seen: new Set(),
+    // a CSS-length size gives no pixels to go by; 160px is the default size
+    detail: Math.min(1, Math.max(0.3, (typeof L.options.size === 'number' ? L.options.size : 160) / 360)),
   };
 }
 
@@ -44,57 +44,42 @@ function anim(c: Ctx, animation: string | undefined, style: Record<string, strin
 
 const stops = (list: [number, Tone][]) => list.map(([offset, tone]) => el('stop', { offset, 'stop-color': ok(tone) }));
 
-const region = { filterUnits: 'userSpaceOnUse', x: -30, y: -30, width: 160, height: 160 };
+const blur = (c: Ctx, sd: number) => def(c, `blur${f(sd)}`.replace('.', '_'), (id) => blurFilter(id, sd));
 
-const blurFilter = (id: string, sd: number) => el('filter', { id, ...region }, el('feGaussianBlur', { stdDeviation: sd }));
-
-// felt: wobbly edge from displacement noise, then dark specks for the pile
-const furFilter = (id: string, scale: number) =>
-  el('filter', { id, ...region },
-    el('feTurbulence', { type: 'fractalNoise', baseFrequency: 0.9, numOctaves: 2, seed: 3, result: 'n' }),
-    el('feDisplacementMap', { in: 'SourceGraphic', in2: 'n', scale, xChannelSelector: 'R', yChannelSelector: 'G', result: 'd' }),
-    el('feTurbulence', { type: 'fractalNoise', baseFrequency: 2.6, seed: 8, result: 'g' }),
-    el('feColorMatrix', { in: 'g', type: 'matrix', values: '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.4 0.82', result: 'specks' }),
-    el('feComposite', { in: 'specks', in2: 'd', operator: 'in', result: 'grain' }),
-    el('feMerge', {}, el('feMergeNode', { in: 'd' }), el('feMergeNode', { in: 'grain' })));
-
-// clay: soft dark rim bottom-right, light rim top-left, both inside the shape
-const clayFilter = (id: string, sd: number, d: number, hue: number) =>
-  el('filter', { id, ...region },
-    el('feGaussianBlur', { in: 'SourceAlpha', stdDeviation: sd, result: 'b' }),
-    el('feOffset', { in: 'b', dx: -d * 0.7, dy: -d, result: 'up' }),
-    el('feComposite', { in: 'SourceAlpha', in2: 'up', operator: 'out', result: 'low' }),
-    el('feFlood', { 'flood-color': ok([0.25, 0.06, hue], 0.45) }),
-    el('feComposite', { in2: 'low', operator: 'in', result: 'shadow' }),
-    el('feOffset', { in: 'b', dx: d * 0.7, dy: d, result: 'down' }),
-    el('feComposite', { in: 'SourceAlpha', in2: 'down', operator: 'out', result: 'high' }),
-    el('feFlood', { 'flood-color': ok([1, 0, 0], 0.35) }),
-    el('feComposite', { in2: 'high', operator: 'in', result: 'light' }),
-    el('feMerge', {}, el('feMergeNode', { in: 'SourceGraphic' }), el('feMergeNode', { in: 'shadow' }), el('feMergeNode', { in: 'light' })));
-
-const relief = (look: LookName, tone: Tone): [number, Tone][] =>
-  look === 'clay'
-    ? [[0, shade(tone, 0.1, -0.02)], [0.45, tone], [1, shade(tone, -0.24)]]
-    : [[0, shade(tone, 0.07)], [0.55, tone], [1, shade(tone, -0.14)]];
+// felt for soft pieces; metal, lenses and frames in plush are glossy like clay
+const SOFT: Role[] = ['fill', 'trim', 'leaf'];
 
 function material(c: Ctx, role: Role): Record<string, string | number | undefined> {
   const tone = c.L.paint.roles[role];
+  const hue = c.L.options.baseHue;
   if (role === 'shine') return { fill: ok(tone), opacity: 0.85 };
   if (role === 'glass') return { fill: ok(tone), opacity: 0.16 };
   if (role === 'lens' && c.look === 'glow') return { fill: ok(tone), opacity: 0.55 };
   if (c.look === 'glow' || c.look === 'flat' || role === 'frame') return { fill: ok(tone) };
 
-  const fill = def(c, `m-${role}`, (id) => el('radialGradient', { id, cx: 0.38, cy: 0.3, r: 0.8 }, stops(relief(c.look, tone))));
-  if (c.look === 'clay') return { fill, filter: def(c, 'clay-s', (id) => clayFilter(id, 0.9, 1.4, c.L.options.baseHue)) };
-  return { fill, filter: FELT.includes(role) ? def(c, 'fur-s', (id) => furFilter(id, 1.4)) : undefined };
+  const felt = c.look === 'plush' && SOFT.includes(role);
+  return {
+    fill: def(c, `m-${role}`, (id) => el('radialGradient', { id, cx: 0.36, cy: 0.28, r: 0.85 }, reliefStops(tone, felt ? 0.7 : 1.3))),
+    filter: felt
+      ? def(c, 'felt-s', (id) => feltFilter(id, 0.45, hue, c.detail))
+      : def(c, 'clay-s', (id) => clayFilter(id, 0.35, hue)),
+  };
 }
 
 function pieceNode(c: Ctx, p: Piece): Node {
   const m = material(c, p.role);
   const attrs = p.width
-    ? { fill: 'none', stroke: ok(c.L.paint.roles[p.role]), 'stroke-width': p.width, 'stroke-linecap': 'round', opacity: m.opacity }
+    ? { fill: 'none', stroke: ok(c.L.paint.roles[p.role]), 'stroke-width': p.width, 'stroke-linecap': 'round', opacity: m.opacity, filter: m.filter }
     : { ...m, 'fill-rule': p.evenodd ? 'evenodd' : undefined };
   return el('path', { d: p.d, transform: partTransform(p.at), ...attrs });
+}
+
+function pieceNodes(c: Ctx, slot: 'head' | 'face'): Node | null {
+  const pieces = c.L.accessories[slot];
+  if (!pieces.length) return null;
+  const solid = c.look === 'plush' || c.look === 'clay';
+  const cast = solid ? def(c, `cast-${slot}`, (id) => castFilter(id, (slot === 'head' ? 1 : 0.6) * c.L.scale, c.L.options.baseHue)) : undefined;
+  return el('g', { filter: cast }, pieces.map((p) => pieceNode(c, p)));
 }
 
 function bodyClip(c: Ctx): string {
@@ -102,23 +87,30 @@ function bodyClip(c: Ctx): string {
 }
 
 function bodyNodes(c: Ctx): Node[] {
-  const { body, paint, face, scale: s } = c.L;
+  const { body, paint, face, scale: s, options } = c.L;
   const d = shapePath(body.shape, body);
-  if (c.look === 'flat') return [el('path', { d, fill: ok(paint.body) })];
+  const hue = options.baseHue;
+
+  // flat shading: one crisp darker crescent on the far side
+  if (c.look === 'flat') {
+    return [
+      el('path', { d, fill: ok(shade(paint.body, -0.07)) }),
+      el('g', { 'clip-path': bodyClip(c) }, el('path', { d, transform: `translate(${f(-2.4 * s)} ${f(-3 * s)})`, fill: ok(paint.body) })),
+    ];
+  }
 
   const fill = def(c, 'body', (id) =>
-    el('radialGradient', { id, gradientUnits: 'userSpaceOnUse', cx: face.x - 8 * s, cy: face.y - 14 * s, r: 62 * s }, stops(relief(c.look, paint.body))));
-  if (c.look === 'plush') return [el('path', { d, fill, filter: def(c, 'fur', (id) => furFilter(id, 3.2)) })];
+    el('radialGradient', { id, gradientUnits: 'userSpaceOnUse', cx: face.x - 12 * s, cy: face.y - 20 * s, r: 64 * s },
+      reliefStops(paint.body, c.look === 'clay' ? 1.8 : 2.1)));
+  if (c.look === 'plush') return [el('path', { d, fill, filter: def(c, 'felt', (id) => feltFilter(id, s, hue, c.detail)) })];
 
-  const hx = face.x - 22 * s;
-  const hy = face.y - 18 * s;
+  const hx = face.x - 21 * s;
+  const hy = face.y - 17 * s;
   return [
-    el('path', { d, fill, filter: def(c, 'clay', (id) => clayFilter(id, 2.2, 3, c.L.options.baseHue)) }),
+    el('path', { d, fill, filter: def(c, 'clay', (id) => clayFilter(id, s, hue)) }),
     el('g', { 'clip-path': bodyClip(c) },
-      el('ellipse', {
-        cx: hx, cy: hy, rx: 9 * s, ry: 4.5 * s, transform: `rotate(-30 ${f(hx)} ${f(hy)})`,
-        fill: '#ffffff', opacity: 0.6, filter: def(c, 'spec', (id) => blurFilter(id, 1.8 * s)),
-      })),
+      el('ellipse', { cx: hx, cy: hy, rx: 10 * s, ry: 5.5 * s, transform: `rotate(-32 ${f(hx)} ${f(hy)})`, fill: '#ffffff', opacity: 0.38, filter: blur(c, 2.6 * s) }),
+      el('ellipse', { cx: hx - 1.5 * s, cy: hy - 0.5 * s, rx: 3.6 * s, ry: 1.7 * s, transform: `rotate(-32 ${f(hx)} ${f(hy)})`, fill: '#ffffff', opacity: 0.75, filter: blur(c, 0.5 * s) })),
   ];
 }
 
@@ -154,9 +146,7 @@ function eyeNodes(c: Ctx): Node[] {
           cx, cy, rx: b.w / 2 - t / 2, ry: b.h / 2 - t / 2, fill: 'none', stroke: color, 'stroke-width': t, 'stroke-linecap': 'round',
           'clip-path': def(c, `arc${i}`, (id) => el('clipPath', { id }, el('rect', { x: b.x - 1, y: b.y - 1, width: b.w + 2, height: b.h * 0.48 + 1 }))),
         })
-      : el('g', blink,
-          el('path', { d: radiusPath(shape.radius ?? '50%', b), fill: color }),
-          c.look !== 'flat' && el('ellipse', { cx: cx + b.w * 0.18, cy: cy - b.h * 0.2, rx: b.w * 0.17, ry: b.h * 0.12, fill: '#ffffff', opacity: 0.9 }));
+      : el('g', blink, c.look === 'flat' ? el('path', { d: radiusPath(shape.radius ?? '50%', b), fill: color }) : bead(c, shape.radius ?? '50%', b));
 
     return el('g', { transform: `rotate(${f(rotate)} ${f(cx)} ${f(cy)})` },
       el('g', {
@@ -165,6 +155,25 @@ function eyeNodes(c: Ctx): Node[] {
         style: c.animate ? { transform: m.css, opacity: mod.hide ? 0 : 1, transition: `transform .35s ${EASE_BACK},opacity .2s ease` } : undefined,
       }, el('g', { 'clip-path': cut }, drawn)));
   });
+}
+
+// a glossy bead set into the body: its socket shadow, a lit underside, a window highlight and a small bounce glint
+function bead(c: Ctx, radius: string, b: { x: number; y: number; w: number; h: number }): Node[] {
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  const s = c.L.scale;
+  const eye = c.L.paint.eye;
+  const socket = c.look === 'plush'
+    ? el('ellipse', { cx, cy: cy + b.h * 0.06, rx: b.w * 0.62, ry: b.h * 0.6, fill: ok([0.1, 0.03, c.L.options.baseHue], 0.5), filter: blur(c, 0.9 * s) })
+    : el('ellipse', { cx: cx + b.w * 0.05, cy: cy + b.h * 0.14, rx: b.w * 0.5, ry: b.h * 0.5, fill: ok([0.1, 0.03, c.L.options.baseHue], 0.32), filter: blur(c, 0.8 * s) });
+  const glossy = def(c, 'bead', (id) =>
+    el('radialGradient', { id, cx: 0.5, cy: 0.78, r: 0.8, fx: 0.5, fy: 0.9 }, stops([[0, shade(eye, 0.2, 0.02)], [0.5, eye], [1, shade(eye, -0.05)]])));
+  return [
+    socket,
+    el('path', { d: radiusPath(radius, b), fill: glossy }),
+    el('ellipse', { cx: cx + b.w * 0.17, cy: cy - b.h * 0.21, rx: b.w * 0.18, ry: b.h * 0.12, transform: `rotate(-24 ${f(cx + b.w * 0.17)} ${f(cy - b.h * 0.21)})`, fill: '#ffffff', opacity: 0.95 }),
+    el('circle', { cx: cx - b.w * 0.17, cy: cy + b.h * 0.24, r: b.w * 0.07, fill: '#ffffff', opacity: 0.4 }),
+  ];
 }
 
 function partNodes(c: Ctx, layer: 'face' | 'fx'): Node | null {
@@ -188,7 +197,7 @@ function blobNodes(c: Ctx): Node | null {
     blobs.map((b, i) =>
       el('ellipse', {
         cx: b.x, cy: b.y, rx: b.w / 2, ry: b.h / 2, fill: b.color,
-        filter: def(c, `blob${i}`, (id) => blurFilter(id, b.blur)),
+        filter: blur(c, b.blur),
         ...anim(c, 'aiav-fade .4s ease-out both'),
       })));
 }
@@ -216,22 +225,29 @@ export function accessoryNodes(L: Layout, slot: 'head' | 'face', o: SceneOptions
   return withDefs(c, L.accessories[slot].map((p) => pieceNode(c, p)));
 }
 
-/** The whole avatar as SVG nodes in a 100×100 view box, for every look but glow. */
+function layers(c: Ctx) {
+  const em = c.L.emotion;
+  return {
+    back: [bodyNodes(c), blobNodes(c)],
+    face: [el('g', anim(c, em ? undefined : `aiav-look 7s ease-in-out ${c.delay} infinite`), eyeNodes(c), partNodes(c, 'face'), pieceNodes(c, 'face'))],
+    front: [pieceNodes(c, 'head'), partNodes(c, 'fx')],
+  };
+}
+
+/**
+ * The live avatar in three SVG layers: the filtered body and hats stay still while the face animates,
+ * so fur and clay are rendered once. Gradients and filters live in the first layer.
+ */
+export function sceneLayers(L: Layout, o: SceneOptions): [Node[], Node[], Node[]] {
+  const c = context(L, o);
+  const { back, face, front } = layers(c);
+  const flat = (list: (Node | Node[] | null | false)[]) => list.flat().filter((n): n is Node => !!n);
+  return [withDefs(c, back), flat(face), flat(front)];
+}
+
+/** The whole avatar as one still SVG in a 100×100 view box, for every look but glow. */
 export function sceneNodes(L: Layout, o: SceneOptions): Node[] {
   const c = context(L, o);
-  const em = L.emotion;
-
-  const avatar = [
-    bodyNodes(c),
-    blobNodes(c),
-    el('g', anim(c, em ? undefined : `aiav-look 7s ease-in-out ${c.delay} infinite`),
-      eyeNodes(c),
-      partNodes(c, 'face'),
-      L.accessories.face.map((p) => pieceNode(c, p))),
-    L.accessories.head.map((p) => pieceNode(c, p)),
-    partNodes(c, 'fx'),
-  ];
-  if (!c.backdrop) return withDefs(c, avatar.flat());
-
-  return withDefs(c, [el('g', { 'clip-path': tileClip(c) }, backdrop(c), avatar)]);
+  const { back, face, front } = layers(c);
+  return withDefs(c, [el('g', { 'clip-path': tileClip(c) }, backdrop(c), back, face, front)]);
 }
