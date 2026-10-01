@@ -2,6 +2,7 @@ import { render, type ComponentChildren } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { Check, Copy, Download, Moon, Shuffle, Sun } from 'lucide-react';
 import {
+  type AccessoryName,
   Avatar,
   type AvatarOptions,
   BODIES,
@@ -11,6 +12,10 @@ import {
   type EmotionHandle,
   EYES,
   EYE_PAIRS,
+  FACE_ACCESSORIES,
+  HEAD_ACCESSORIES,
+  LOOKS,
+  type LookName,
   PALETTES,
   type PaletteName,
   TILES,
@@ -30,8 +35,10 @@ import { Switch } from '@/components/ui/switch';
 import { TabItem, Tabs, TabsList } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
-type State = Required<Omit<AvatarOptions, 'seed' | 'colors' | 'size' | 'label' | 'hue' | 'emotion' | 'emotionVariant'>> & {
+type State = Required<Omit<AvatarOptions, 'seed' | 'colors' | 'size' | 'label' | 'hue' | 'accentHue' | 'accessories' | 'emotion' | 'emotionVariant'>> & {
   hue: number | null;
+  accentHue: number | null;
+  accessories: AccessoryName[];
 };
 type ExportTab = 'jsx' | 'element' | 'html' | 'svg';
 type Mood = Pick<EmotionHandle, 'emotion' | 'emotionKey'>;
@@ -50,12 +57,12 @@ const SLIDERS = [
 ] as const;
 
 const INITIAL: State = {
-  palette: 'sky', hue: null, saturation: 100, tile: 'squircle', body: 'dome', eyes: 'oval',
+  look: 'glow', accessories: [], accentHue: null, palette: 'sky', hue: null, saturation: 100, tile: 'squircle', body: 'dome', eyes: 'oval',
   tilt: 12, spacing: 1, eyeScale: 1, gazeX: 0, gazeY: 0, animate: true,
 };
 
 const EYE_OPTIONS = [...Object.keys(EYES), ...Object.keys(EYE_PAIRS)] as State['eyes'][];
-const ATTR: Record<string, string> = { eyeScale: 'eye-scale', gazeX: 'gaze-x', gazeY: 'gaze-y' };
+const ATTR: Record<string, string> = { eyeScale: 'eye-scale', gazeX: 'gaze-x', gazeY: 'gaze-y', accentHue: 'accent-hue' };
 
 function randomSeed() {
   return `${WORDS[Math.floor(Math.random() * WORDS.length)]}-${Math.floor(Math.random() * 1000)}`;
@@ -82,7 +89,7 @@ function exportCode(state: State, tab: ExportTab) {
 
   const opts = Object.entries(changed(state));
   if (tab === 'element') {
-    const attrs = opts.map(([k, v]) => ` ${ATTR[k] ?? k}="${v}"`).join('');
+    const attrs = opts.map(([k, v]) => ` ${ATTR[k] ?? k}="${Array.isArray(v) ? v.join(' ') : v}"`).join('');
     return `<script type="module">\n  import { defineAvatarElement } from '@justanarthur/just-ai-avatar/element';\n  defineAvatarElement();\n</script>\n\n<ai-avatar size="96"${attrs}></ai-avatar>`;
   }
 
@@ -129,6 +136,31 @@ const Picker = <K extends 'body' | 'eyes'>(props: { options: State[K][]; state: 
     ))}
   </div>
 );
+
+const AccessoryPicker = ({ state, slot, set }: { state: State; slot: AccessoryName[]; set: (patch: Partial<State>) => void }) => {
+  const current = state.accessories.find((a) => slot.includes(a)) ?? null;
+  const pick = (a: AccessoryName | null) => [...state.accessories.filter((x) => !slot.includes(x)), ...(a ? [a] : [])];
+
+  return (
+    <div class="grid grid-cols-4 gap-1">
+      {[null, ...slot].map((opt) => (
+        <button
+          key={opt ?? 'none'}
+          type="button"
+          aria-pressed={current === opt}
+          onClick={() => set({ accessories: pick(opt) })}
+          class={cn(
+            'flex cursor-pointer flex-col items-center gap-1 rounded-xl px-1 pt-1.5 pb-1 text-[11px] transition-colors',
+            current === opt ? 'bg-[var(--active)] text-foreground' : 'text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground',
+          )}
+        >
+          <Avatar {...state} accessories={pick(opt)} animate={false} size={44} />
+          {opt ?? 'none'}
+        </button>
+      ))}
+    </div>
+  );
+};
 
 const MoodCard = ({ mood, animate, onAnimate }: { mood: ReturnType<typeof useEmotion>; animate: boolean; onAnimate: () => void }) => {
   const [hold, setHold] = useState(false);
@@ -255,6 +287,12 @@ const CustomizeCard = ({ state, set }: { state: State; set: (patch: Partial<Stat
   return (
     <Card caption="Customize" class="self-start">
       <div class="flex flex-col gap-6 p-4">
+        <Section title="Look" value={state.look}>
+          <Tabs value={state.look} onValueChange={(v) => set({ look: v as LookName })} size="compact">
+            <TabsList>{LOOKS.map((l) => <TabItem key={l} value={l} label={l} />)}</TabsList>
+          </Tabs>
+        </Section>
+
         <Section title="Color" value={state.hue == null ? state.palette : `hue ${state.hue}`}>
           <div class="flex flex-wrap gap-1.5">
             {(Object.keys(PALETTES) as PaletteName[]).map((name) => {
@@ -286,6 +324,19 @@ const CustomizeCard = ({ state, set }: { state: State; set: (patch: Partial<Stat
 
         <Section title="Eyes" value={String(state.eyes)}>
           <Picker options={EYE_OPTIONS} state={state} field="eyes" onPick={(eyes) => set({ eyes })} />
+        </Section>
+
+        <Section title="Head" value={state.accessories.find((a) => HEAD_ACCESSORIES.includes(a)) ?? 'none'}>
+          <AccessoryPicker state={state} slot={HEAD_ACCESSORIES} set={set} />
+        </Section>
+
+        <Section title="Face" value={state.accessories.find((a) => FACE_ACCESSORIES.includes(a)) ?? 'none'}>
+          <AccessoryPicker state={state} slot={FACE_ACCESSORIES} set={set} />
+        </Section>
+
+        <Section title="Accessory color" value={state.accentHue == null ? 'auto' : `hue ${state.accentHue}`}>
+          <Slider value={state.accentHue ?? (hue + 160) % 360} onChange={(v) => set({ accentHue: v as number })} min={0} max={359} step={1} label="Accessory hue" size="compact" showValue={false} hideFill
+            trackStyle={{ background: 'linear-gradient(90deg in oklch longer hue, oklch(.65 .17 0), oklch(.65 .17 359))' }} />
         </Section>
 
         <Section title="Tile">
@@ -332,7 +383,7 @@ const App = () => {
       <header class="flex flex-wrap items-end justify-between gap-6 pt-16 pb-10 sm:pt-24">
         <div>
           <h1 class="m-0 text-[28px] tracking-[-0.02em]" style={{ fontVariationSettings: "'wght' 650, 'opsz' 28" }}>Just AI Avatar</h1>
-          <p class="mt-1.5 mb-5 text-[15px] text-muted-foreground">Glowing AI avatars in plain HTML and CSS, with moods.</p>
+          <p class="mt-1.5 mb-5 text-[15px] text-muted-foreground">AI avatars in four looks, with accessories and moods.</p>
           <Button size="compact" leadingIcon={Shuffle} onClick={() => applySeed(randomSeed())}>Randomize</Button>
         </div>
         <Button variant="ghost" size="icon-compact" aria-label="Toggle theme" leadingIcon={dark ? Sun : Moon} onClick={() => setDark(!dark)} />
