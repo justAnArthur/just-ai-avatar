@@ -1,6 +1,6 @@
 {
   "name": "@justanarthur/just-ai-avatar",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Glowing AI avatars in plain HTML + CSS, as a Preact component",
   "license": "MIT",
   "repository": {
