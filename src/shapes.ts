@@ -1,25 +1,19 @@
-/** Rectangle in % of its parent. */
-export interface Box {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
+export type Box = { x: number; y: number; w: number; h: number };
 
-/** A CSS border-radius, or a polygon (points in % of the box) with rounded corners. */
+/** CSS border-radius, or polygon points in % of the box with rounded corners. */
 export type Shape = { radius: string } | { points: [number, number][]; round: number };
 
-export interface BodyDef {
-  /** Body box in % of the tile. Every body overflows the tile so the tile crops it. */
+export type BodyDef = {
+  /** % of the tile; must overflow it so the tile crops the body. */
   box: Box;
   shape: Shape;
-  /** Cyan glow: center + size in % of the body box. Defaults to the body's shape. */
+  /** Glow center and size in % of the body box. */
   core: { cx: number; cy: number; w: number; h: number; shape?: Shape };
-  /** Midpoint between the eyes, in % of the body box. */
+  /** Point between the eyes, % of the body box. */
   face: { x: number; y: number };
-  /** Eye and blur scale relative to the original dome. */
+  /** Relative to the original dome. */
   scale: number;
-}
+};
 
 export const BODIES = {
   dome: {
@@ -82,15 +76,15 @@ export const BODIES = {
 
 export type BodyName = keyof typeof BODIES;
 
-export interface EyeDef {
+export type EyeDef = {
   w: number;
   h: number;
   radius?: string;
-  /** Drawn as the top half of a ring: a closed, smiling eye. */
+  /** Top half of a ring: a closed, smiling eye. */
   arc?: boolean;
-}
+};
 
-/** Eye sizes in % of the tile, for the original dome. */
+/** Sizes in % of the tile on the original dome. */
 export const EYES = {
   oval: { w: 17.3, h: 22.9 },
   round: { w: 18, h: 18 },
@@ -123,12 +117,7 @@ const f = (n: number) => +n.toFixed(2);
 
 type Pt = readonly [number, number];
 
-/**
- * Rounded corners of a polygon whose points are in % of a `w`×`h` box. Each corner
- * becomes a quadratic Bézier from `s` to `e` with the original corner `p` as control
- * point. Rounding is done in real proportions (`round` is in the same unit as
- * `w`/`h`), so a non-square box still gets circular-looking corners.
- */
+/** Each corner becomes a quadratic Bézier s→e around p; `round` uses `w`/`h` units so corners stay circular. */
 export function polygonCorners(points: [number, number][], w: number, h: number, round: number) {
   const P = points.map(([x, y]) => [(x * w) / 100, (y * h) / 100] as const);
   const n = P.length;
@@ -144,7 +133,6 @@ export function polygonCorners(points: [number, number][], w: number, h: number,
   });
 }
 
-/** CSS polygon() with rounded corners (each Bézier corner sampled into `steps` segments). */
 export function roundedPolygon(points: [number, number][], w: number, h: number, round: number, steps = 6): string {
   const out: string[] = [];
   for (const { s, p, e } of polygonCorners(points, w, h, round)) {
@@ -158,7 +146,6 @@ export function roundedPolygon(points: [number, number][], w: number, h: number,
   return `polygon(${out.join(',')})`;
 }
 
-/** CSS for a shape drawn in a box of `w`×`h` tile units. */
 export function shapeStyle(shape: Shape, w: number, h: number): { borderRadius?: string; clipPath?: string } {
   return 'radius' in shape ? { borderRadius: shape.radius } : { clipPath: roundedPolygon(shape.points, w, h, shape.round) };
 }

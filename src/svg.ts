@@ -4,14 +4,14 @@ import { layout } from './layout.ts';
 import { type AvatarOptions, rngFromSeed } from './options.ts';
 import { type Box, polygonCorners, type Shape } from './shapes.ts';
 
-export interface SvgOptions {
-  /** Prefix for the ids inside the SVG; set it when inlining several SVGs into one page. */
+export type SvgOptions = {
+  /** Set it when inlining several SVGs into one page. */
   idPrefix?: string;
-}
+};
 
 const n = (v: number) => +v.toFixed(3);
 
-/** SVG path for a CSS border-radius on a box (handles `a b c d / e f g h`, % and px). */
+/** SVG path of a CSS border-radius (`a b c d / e f g h`, % and px). */
 export function radiusPath(radius: string, b: Box): string {
   const [hPart, vPart] = radius.split('/').map((p) => p.trim().split(/\s+/));
   const expand = (v: string[]) => {
@@ -21,7 +21,7 @@ export function radiusPath(radius: string, b: Box): string {
   const len = (v: string, dim: number) => (v.endsWith('%') ? (parseFloat(v) / 100) * dim : parseFloat(v) || 0);
   let H = expand(hPart!).map((v) => len(v, b.w));
   let V = expand(vPart ?? hPart!).map((v) => len(v, b.h));
-  // CSS scales all radii down when adjacent ones overlap
+  // css shrinks every radius when adjacent ones overlap
   const ratio = (side: number, a: number, c: number) => (a + c > 0 ? side / (a + c) : Infinity);
   const k = Math.min(1, ratio(b.w, H[0]!, H[1]!), ratio(b.w, H[3]!, H[2]!), ratio(b.h, V[0]!, V[3]!), ratio(b.h, V[1]!, V[2]!));
   H = H.map((v) => v * k);
@@ -52,7 +52,6 @@ function shapePath(shape: Shape, b: Box): string {
     .join('')}Z`;
 }
 
-/** `fill="…"` / `stroke="…"` with a separate opacity attribute, so editors keep the alpha. */
 function paint(attr: 'fill' | 'stroke' | 'stop-color' | 'flood-color', css: string): string {
   const { hex, alpha } = toHex(css);
   const opacityAttr = attr === 'stop-color' ? 'stop-opacity' : attr === 'flood-color' ? 'flood-opacity' : `${attr}-opacity`;
@@ -64,11 +63,7 @@ const stops = (list: [number, string][]) => list.map(([o, c]) => `<stop offset="
 const blurFilter = (id: string, sd: number) =>
   `<filter id="${id}" filterUnits="userSpaceOnUse" x="-50" y="-50" width="200" height="200"><feGaussianBlur stdDeviation="${n(sd)}"/></filter>`;
 
-/**
- * Static SVG of an avatar (no animation). Real vector shapes, gradients and blur filters,
- * with hex colors only, so it opens in Figma, Illustrator and Inkscape and can be drawn
- * onto a canvas for PNG/JPEG export. Works in the browser and on the server.
- */
+/** Still SVG with hex colors only, so design tools open it; also the source for PNG/JPEG export. */
 export function renderAvatarSVG(options: AvatarOptions = {}, svgOptions: SvgOptions = {}): string {
   const L = layout(options);
   const c = L.colors;
@@ -81,7 +76,7 @@ export function renderAvatarSVG(options: AvatarOptions = {}, svgOptions: SvgOpti
   const corePath = shapePath(L.core.shape, L.core);
   const coreCx = L.core.x + L.core.w / 2;
   const coreCy = L.core.y + L.core.h / 2;
-  const coreR = Math.hypot(L.core.w / 2, L.core.h / 2); // CSS `circle` = farthest-corner
+  const coreR = Math.hypot(L.core.w / 2, L.core.h / 2); // css `circle` reaches the farthest corner
 
   const defs = [
     `<clipPath id="${id}-tile"><path d="${tilePath}"/></clipPath>`,
@@ -92,7 +87,6 @@ export function renderAvatarSVG(options: AvatarOptions = {}, svgOptions: SvgOpti
     blurFilter(`${id}-core-blur`, L.blur.core),
     blurFilter(`${id}-shade-blur`, L.blur.shade),
     blurFilter(`${id}-eye-glow`, 1.25 * s),
-    // white glow around the body: blurred alpha, tinted, under the source
     `<filter id="${id}-glow" filterUnits="userSpaceOnUse" x="-50" y="-50" width="200" height="200">` +
       `<feGaussianBlur in="SourceAlpha" stdDeviation="${n(L.blur.glow)}" result="b"/>` +
       `<feFlood flood-color="#ffffff" flood-opacity="0.75"/><feComposite in2="b" operator="in" result="g"/>` +
@@ -105,7 +99,6 @@ export function renderAvatarSVG(options: AvatarOptions = {}, svgOptions: SvgOpti
     const cy = b.y + b.h / 2;
     const [sx, sy] = mod.scale ?? [1, 1];
     const [dx, dy] = mod.offset ?? [0, 0];
-    // same order as the HTML: rotate with the head, then the emotion's shift and squash
     const transform =
       `rotate(${n(rotate)} ${n(cx)} ${n(cy)})` +
       (dx || dy ? ` translate(${n(dx)} ${n(dy)})` : '') +
@@ -141,7 +134,6 @@ export function renderAvatarSVG(options: AvatarOptions = {}, svgOptions: SvgOpti
   });
   let overlay = '';
   if (em?.parts.length) {
-    // neon glow like the HTML layer's drop-shadow
     const { hex, alpha } = toHex(c.eyeGlow);
     defs.push(
       `<filter id="${id}-fx-glow" filterUnits="userSpaceOnUse" x="-50" y="-50" width="200" height="200">` +

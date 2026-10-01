@@ -1,4 +1,4 @@
-export interface Colors {
+export type Colors = {
   bgTop: string;
   bgBottom: string;
   core: string;
@@ -11,7 +11,7 @@ export interface Colors {
   eyeBottom: string;
   eyeLine: string;
   eyeGlow: string;
-}
+};
 
 export type Palette = { hue: number; saturation?: number } | { colors: Colors };
 
@@ -46,13 +46,10 @@ export const PALETTES = {
 
 export type PaletteName = keyof typeof PALETTES;
 
-/**
- * Full color set for a hue. OKLCH keeps perceived brightness equal across hues;
- * lightness/chroma/hue offsets are measured from the original sky avatar (hue 233).
- */
+/** Full color set for an OKLCH hue, with the original sky avatar's lightness and chroma. */
 export function colorsFromHue(hue: number, saturation = 100): Colors {
   const k = saturation / 100;
-  // yellows and limes only look clean when lighter, so lift them a little
+  // yellows and limes go muddy at the sky avatar's lightness
   const d = Math.abs(((((hue - 105) % 360) + 540) % 360) - 180);
   const lift = d < 60 ? 0.11 * Math.cos((d / 60) * (Math.PI / 2)) * k : 0;
 

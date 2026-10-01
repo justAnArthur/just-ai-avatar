@@ -3,50 +3,41 @@ import { type EmotionFrame, type EyeMod, buildEmotion, emotionName } from './emo
 import { type AvatarOptions, type Resolved, resolve } from './options.ts';
 import { BODIES, type BodyDef, type Box, EYES, type EyeDef, type Shape, TILES } from './shapes.ts';
 
-export interface EyeLayout {
+export type EyeLayout = {
   def: EyeDef;
-  /** Eye box in tile units (0–100); it rotates around its own center. */
+  /** Rotates around its own center. */
   box: Box;
   rotate: number;
-  /** How the current emotion changes this eye (empty when calm). */
   mod: EyeMod;
-}
+};
 
-/**
- * Geometry shared by the HTML component and the SVG renderer.
- * Every length is in tile units: the tile is 100×100, so 1 unit = 1% = 1cqw.
- */
-export interface Layout {
+/** Geometry shared by the HTML and SVG renderers, in tile units: the tile is 100×100, 1 unit = 1cqw. */
+export type Layout = {
   options: Resolved;
   colors: Colors;
-  /** CSS border-radius of the tile. */
   tileRadius: string;
   hasBackground: boolean;
   body: Box & { shape: Shape };
   core: Box & { shape: Shape };
   shade: Box;
   eyes: [EyeLayout, EyeLayout];
-  /** Blur standard deviations, in tile units. */
+  /** Standard deviations. */
   blur: { core: number; shade: number; glow: number };
-  /** Multiplier for eye outline / glow sizes. */
   scale: number;
-  /** The active emotion, if any. */
   emotion: EmotionFrame | null;
-}
+};
 
 export function layout(input: AvatarOptions = {}): Layout {
   const o = resolve(input);
   const B: BodyDef = BODIES[o.body];
   const s = B.scale;
   const { box } = B;
-  const inBody = (bx: number, by: number) => [box.x + (bx * box.w) / 100, box.y + (by * box.h) / 100] as const;
+  const inBody = (x: number, y: number) => [box.x + (x * box.w) / 100, box.y + (y * box.h) / 100] as const;
 
   const [fx, fy] = inBody(B.face.x, B.face.y);
-
+  const [ccx, ccy] = inBody(B.core.cx, B.core.cy);
   const coreW = (B.core.w * box.w) / 100;
   const coreH = (B.core.h * box.h) / 100;
-  const [ccx, ccy] = inBody(B.core.cx, B.core.cy);
-
   const shadeW = 39.8 * s;
   const shadeH = 30.9 * s;
 

@@ -24,8 +24,9 @@ describe('resolve', () => {
   test('unknown values fall back', () => {
     expect(resolve({ body: 'nope' as never, eyes: 'nope' as never })).toMatchObject({ body: 'dome', eyes: ['oval', 'oval'] });
   });
-  test('animate: true enables everything', () => {
-    expect(resolve({ animate: true }).animate).toEqual(['blink', 'float', 'look']);
+  test('avatars are animated unless asked not to be', () => {
+    expect(resolve({}).animate).toBe(true);
+    expect(resolve({ animate: false }).animate).toBe(false);
   });
 });
 
@@ -57,9 +58,19 @@ describe('render', () => {
   test('polygon bodies use clip-path', () => {
     expect(renderAvatarHTML({ body: 'hexagon' })).toContain('clip-path:polygon(');
   });
-  test('keyframes only when animated', () => {
-    expect(renderAvatarHTML({})).not.toContain('@keyframes');
-    expect(renderAvatarHTML({ animate: ['blink'] })).toContain('@keyframes aiav-blink');
+  test('a still avatar has no keyframes or animations', () => {
+    expect(renderAvatarHTML({})).toContain('@keyframes aiav-blink');
+    for (const emotion of [undefined, 'love'] as const) {
+      const html = renderAvatarHTML({ animate: false, emotion });
+      expect(html).not.toContain('@keyframes');
+      expect(html).not.toContain('animation:');
+    }
+  });
+  test('idle life pauses while an emotion plays', () => {
+    const html = renderAvatarHTML({ emotion: 'scared' });
+    expect(html).not.toContain('aiav-blink 4.5s');
+    expect(html).not.toContain('aiav-look 7s');
+    expect(html).toContain('aiav-float 5s');
   });
   test('label is escaped', () => {
     expect(renderAvatarHTML({ label: '"><x>' })).not.toContain('"><x>');

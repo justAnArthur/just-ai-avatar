@@ -3,17 +3,17 @@ import { renderAvatarSVG } from './svg.ts';
 
 export type ExportFormat = 'svg' | 'png' | 'jpeg';
 
-export interface ExportOptions {
+export type ExportOptions = {
   format?: ExportFormat;
-  /** Output width and height in px. */
+  /** px */
   size?: number;
-  /** JPEG has no transparency, so the tile's rounded corners get this color. */
+  /** Fills the rounded corners in JPEG, which has no transparency. */
   background?: string;
   /** JPEG quality, 0–1. */
   quality?: number;
-}
+};
 
-/** Renders an avatar to an SVG, PNG or JPEG Blob (browser only for PNG/JPEG). */
+/** PNG and JPEG need a browser. */
 export async function avatarToBlob(options: AvatarOptions, { format = 'png', size = 512, background = '#ffffff', quality = 0.92 }: ExportOptions = {}): Promise<Blob> {
   const svg = renderAvatarSVG({ ...options, size });
   if (format === 'svg') return new Blob([svg], { type: 'image/svg+xml' });
@@ -41,7 +41,6 @@ export async function avatarToBlob(options: AvatarOptions, { format = 'png', siz
   }
 }
 
-/** Renders and downloads an avatar as `<filename>.<svg|png|jpg>`. */
 export async function downloadAvatar(options: AvatarOptions, exportOptions: ExportOptions & { filename?: string } = {}): Promise<void> {
   const { filename = 'ai-avatar', ...rest } = exportOptions;
   const format = rest.format ?? 'png';

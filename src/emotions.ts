@@ -1,12 +1,7 @@
 import type { Colors } from './colors.ts';
 import { rngFromSeed } from './options.ts';
 
-/**
- * Emotions are data: eye modifications, SVG parts and soft blobs, all in tile units
- * (the tile is 100×100). The HTML component animates them; the SVG renderer draws a
- * static frame of the same parts. Each emotion has a few variants and the avatar's
- * seed picks one, so two avatars never express "scared" quite the same way.
- */
+// emotions are data in tile units: the HTML renderer animates them, the SVG renderer draws a still frame
 
 export const EMOTIONS = [
   'happy', 'laugh', 'love', 'wink', 'surprised', 'scared',
@@ -15,7 +10,7 @@ export const EMOTIONS = [
 
 export type EmotionName = (typeof EMOTIONS)[number];
 
-/** Friendlier names for app events: `emote('error')`, `emote('success')`. */
+/** App-event names: `emote('error')`, `emote('success')`. */
 export const EMOTION_ALIASES = {
   joy: 'happy', success: 'happy', done: 'happy',
   lol: 'laugh',
@@ -38,82 +33,61 @@ export function emotionName(input: string | null | undefined): EmotionName | nul
   return (EMOTION_ALIASES as Record<string, EmotionName>)[input] ?? null;
 }
 
-/** How long a triggered emotion plays before the avatar calms down, in ms. */
+/** ms a triggered emotion plays before the avatar calms down. */
 export const EMOTION_DURATION: Record<EmotionName, number> = {
   happy: 2200, laugh: 2600, love: 2800, wink: 1600, surprised: 2000, scared: 2800,
   sad: 3000, crying: 3400, angry: 2600, sleepy: 4000, dizzy: 3000, thinking: 3200,
 };
 
-// ------------------------------------------------------------------ frame types
-
-export interface EyeMod {
-  /** Hide the regular eye (an SVG part draws a replacement). */
+export type EyeMod = {
+  /** An SVG part draws the replacement. */
   hide?: boolean;
   scale?: [number, number];
-  /** Tile units. */
   offset?: [number, number];
-  /** Slant of the top edge: >0 angry (inner corner down), <0 sad (outer corner down). 0–1 of eye height. */
+  /** Top-edge slant as a fraction of eye height: >0 angry (inner corner down), <0 sad (outer corner down). */
   cut?: number;
-}
+};
 
-export interface Part {
-  /** `face` moves with the eyes (look-around); `fx` stays put. */
+export type Part = {
+  /** `face` moves with the eyes when they look around, `fx` stays put. */
   layer: 'face' | 'fx';
   d: string;
   fill?: string;
   stroke?: string;
-  /** Stroke width in tile units, before `scale`. */
+  /** In the part's own units, before `at.scale`. */
   width?: number;
   opacity?: number;
-  /** stroke-dasharray, in the part's own units. */
   dash?: [number, number];
-  /** Position: translate + rotate + uniform scale, applied to `d`. */
   at?: { x: number; y: number; scale?: number; rotate?: number };
-  /** CSS animation (HTML only); its keyframes are in EMOTION_KEYFRAMES. */
+  /** CSS animation, keyframes in EMOTION_KEYFRAMES. */
   anim?: string;
-  /** Animate around the part's own center (default) or a fixed point (orbits). */
+  /** Fixed animation pivot for orbits; default is the part's own center. */
   origin?: [number, number];
-}
+};
 
-/** Soft blurred ellipse drawn inside the body (blush, angry flush). */
-export interface Blob {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  color: string;
-  blur: number;
-}
+/** Blurred ellipse inside the body: blush, angry flush. */
+export type Blob = { x: number; y: number; w: number; h: number; color: string; blur: number };
 
-export interface EmotionFrame {
+export type EmotionFrame = {
   name: EmotionName;
   variant: number;
   eyes: [EyeMod, EyeMod];
   parts: Part[];
   blobs: Blob[];
-  /** CSS animation for the whole creature (HTML only). */
+  /** CSS animation of the whole avatar. */
   motion?: string;
-}
+};
 
-export interface EmotionContext {
+export type EmotionContext = {
   colors: Colors;
-  /** Size scale of the body (1 = original dome). */
   s: number;
   face: { x: number; y: number };
-  /** Eye centers and sizes, tile units, left then right. */
   eyes: [EyeBox, EyeBox];
   tilt: number;
   rnd: () => number;
-}
+};
 
-interface EyeBox {
-  cx: number;
-  cy: number;
-  w: number;
-  h: number;
-}
-
-// ------------------------------------------------------------------ shapes (unit size ≈ [-1, 1])
+type EyeBox = { cx: number; cy: number; w: number; h: number };
 
 const SHAPES = {
   heart: 'M0 0.9C-0.2 0.75-1 0.25-1-0.3C-1-0.75-0.65-1-0.35-1C-0.15-1 0-0.85 0-0.7C0-0.85 0.15-1 0.35-1C0.65-1 1-0.75 1-0.3C1 0.25 0.2 0.75 0 0.9Z',
@@ -161,8 +135,6 @@ function spiralPath(): string {
   return `M${pts.join('L')}`;
 }
 
-// ------------------------------------------------------------------ builders
-
 const HEART = '#ff5c8a';
 const TEAR = '#9fe2ff';
 const ANGER = '#ff4d4d';
@@ -170,21 +142,18 @@ const GOLD = '#ffd84d';
 
 type Build = (k: Kit) => Omit<EmotionFrame, 'name' | 'variant'>;
 
-/** Helpers bound to one avatar, so the variants below stay readable. */
 function kit(ctx: EmotionContext) {
   const { colors: c, s, face, eyes, tilt, rnd } = ctx;
   const ink = c.eyeMid;
   const stroke = 3.4 * s;
   const side = rnd() < 0.5 ? -1 : 1;
 
-  /** Glowing stroke shape at an eye position, replacing that eye. */
   const eyeStroke = (i: 0 | 1, d: string, opts: Partial<Part> = {}): Part => {
     const e = eyes[i];
     const size = Math.max(e.w, e.h * 0.8);
     return { layer: 'face', d, stroke: ink, width: stroke / size, at: { x: e.cx, y: e.cy, scale: size, rotate: -tilt }, anim: 'aiav-pop .35s cubic-bezier(.3,1.6,.5,1) both', ...opts };
   };
 
-  /** Mouth below the eyes. */
   const mouthY = face.y + Math.max(eyes[0].h, eyes[1].h) * 0.5 + 6 * s;
   const mouth = (d: string, w: number, opts: Partial<Part> = {}): Part => ({
     layer: 'face', d, stroke: ink, width: stroke / w,
@@ -353,7 +322,6 @@ const VARIANTS: Record<EmotionName, Build[]> = {
       eyes: [{ cut: -0.5, scale: [1, 0.85] }, { cut: -0.5, scale: [1, 0.85] }],
       parts: [
         k.mouth(oMouth, 6 * k.s, { fill: k.c.eyeLine }),
-        // waterfalls of tears down the face
         ...([0, 1] as const).map((i): Part => ({
           layer: 'face', d: `M0 0V${+(100 - k.eyes[i].cy).toFixed(2)}`, stroke: TEAR, width: k.eyes[i].w * 0.45, opacity: 0.85,
           dash: [4, 4], at: { x: k.eyes[i].cx, y: k.eyes[i].cy + k.eyes[i].h * 0.3 }, anim: 'aiav-stream .6s linear infinite',
@@ -461,13 +429,11 @@ function orbit(k: Kit): Part[] {
   });
 }
 
-// ------------------------------------------------------------------ public
-
 export function variantCount(name: EmotionName): number {
   return VARIANTS[name].length;
 }
 
-/** Builds one emotion for one avatar. `seedKey` picks the variant and small details. */
+/** `seedKey` picks the variant and its small details. */
 export function buildEmotion(name: EmotionName, ctx: Omit<EmotionContext, 'rnd'>, seedKey: string, variant?: number): EmotionFrame {
   const rnd = rngFromSeed(`${seedKey}:${name}`);
   const list = VARIANTS[name];
@@ -475,7 +441,6 @@ export function buildEmotion(name: EmotionName, ctx: Omit<EmotionContext, 'rnd'>
   return { name, variant: v, ...list[v]!(kit({ ...ctx, rnd })) };
 }
 
-/** Keyframes for emotion parts and motions. Lengths inside SVG parts are tile units. */
 export const EMOTION_KEYFRAMES =
   '@keyframes aiav-fade{from{opacity:0}to{opacity:1}}' +
   '@keyframes aiav-pop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.15);opacity:1}100%{transform:scale(1)}}' +
@@ -503,14 +468,10 @@ export const EMOTION_KEYFRAMES =
   '@keyframes aiav-m-sway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}' +
   '@keyframes aiav-m-tilt{0%{transform:rotate(0)}30%,80%{transform:rotate(-5deg)}100%{transform:rotate(-5deg)}}';
 
-/**
- * Clip polygon for a slanted eye top, as fractions of the eye box. It extends half a box
- * past every edge so the eye's outline and glow survive; only the slanted top cuts.
- */
+// extends half a box past every edge so the eye's outline and glow survive the clip
 export function cutPolygon(cut: number | undefined, left: boolean): [number, number][] {
   const t = Math.abs(cut ?? 0);
   if (!t) return [[-0.5, -0.5], [1.5, -0.5], [1.5, 1.5], [-0.5, 1.5]];
-  // angry lowers the inner corner, sad the outer one; the inner corner of the left eye is its right side
   const rightDown = left === (cut! > 0);
   const top: [number, number][] = rightDown ? [[-0.5, -0.5 * t], [1.5, 1.5 * t]] : [[-0.5, 1.5 * t], [1.5, -0.5 * t]];
   return [...top, [1.5, 1.5], [-0.5, 1.5]];
@@ -521,4 +482,9 @@ export function partTransform(at: Part['at']): string | undefined {
   const r = at.rotate ? ` rotate(${+at.rotate.toFixed(2)})` : '';
   const k = at.scale != null && at.scale !== 1 ? ` scale(${+at.scale.toFixed(3)})` : '';
   return `translate(${+at.x.toFixed(3)} ${+at.y.toFixed(3)})${r}${k}`;
+}
+
+export function playTime(emotion: EmotionInput, duration?: number) {
+  const name = emotionName(emotion);
+  return duration ?? (name ? EMOTION_DURATION[name] : 2500);
 }

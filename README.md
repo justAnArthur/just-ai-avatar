@@ -36,7 +36,7 @@ The CLI puts some files in `src/components/ui`; move them to `playground/compone
 import { Avatar } from '@justanarthur/just-ai-avatar';
 
 <Avatar seed="agent-42" size={96} />                      // same seed → same avatar
-<Avatar body="hexagon" eyes="wink" palette="grape" animate={['blink', 'float']} />
+<Avatar body="hexagon" eyes="wink" palette="grape" />
 <Avatar hue={150} body="arch" eyes={['round', 'happy']} />
 ```
 
@@ -54,10 +54,13 @@ Without JSX, as a web component:
   import { defineAvatarElement } from '@justanarthur/just-ai-avatar/element';
   defineAvatarElement();
 </script>
-<ai-avatar seed="agent-42" body="triangle" eyes="oval happy" animate="blink"></ai-avatar>
+<ai-avatar seed="agent-42" body="triangle" eyes="oval happy"></ai-avatar>
 ```
 
-## Emotions
+## Moods
+
+An avatar is either calm or feeling something. Calm avatars blink, float and look around; an emotion
+replaces that idle life with its own motion until it ends. `animate={false}` renders a still image.
 
 Twelve animated emotions: `happy` `laugh` `love` `wink` `surprised` `scared` `sad` `crying` `angry` `sleepy`
 `dizzy` `thinking`. Eyes morph (squash, slant, close, turn into hearts, X's, spirals), a mouth appears, and
@@ -130,7 +133,9 @@ JPEG has no transparency, so the tile's rounded corners are filled with `backgro
 | `tilt` | head tilt in degrees | `12` |
 | `spacing` / `eyeScale` | multipliers | `1` |
 | `gazeX` / `gazeY` | -1 … 1 | `0` |
-| `animate` | any of `blink` `float` `look`, or `true` | `[]` |
+| `animate` | idle life and emotion motion; `false` for a still image | `true` |
+| `emotion` | any emotion or alias, held until cleared | – |
+| `emotionVariant` | force a variant instead of the seed's | – |
 | `label` | accessible name | `AI avatar` |
 
 Explicit options override what a seed picks. Web component attributes use kebab-case (`eye-scale`, `gaze-x`).

@@ -1,8 +1,4 @@
-/**
- * Converts the CSS colors this library produces (oklch(), rgb(), #hex) into a hex color
- * plus opacity. SVG editors (Figma, Illustrator, Inkscape) don't read oklch(), so
- * exported SVGs only contain hex colors.
- */
+// design tools (Figma, Illustrator, Inkscape) don't read oklch(), so exported SVGs use hex + opacity
 export function toHex(css: string): { hex: string; alpha: number } {
   const s = css.trim().toLowerCase();
 
@@ -33,7 +29,6 @@ export function toHex(css: string): { hex: string; alpha: number } {
 const clamp = (v: number) => Math.min(1, Math.max(0, v));
 const parseAlpha = (a: string) => (a.trim().endsWith('%') ? parseFloat(a) / 100 : parseFloat(a));
 
-/** OKLCH → gamma-encoded sRGB (0–1), with chroma reduced until the color fits the sRGB gamut. */
 function oklchToSrgb(L: number, C: number, H: number): [number, number, number] {
   const convert = (c: number) => {
     const h = (H * Math.PI) / 180;
@@ -50,9 +45,10 @@ function oklchToSrgb(L: number, C: number, H: number): [number, number, number] 
   };
   const inGamut = (rgb: number[]) => rgb.every((v) => v >= -0.001 && v <= 1.001);
 
-  let rgb = convert(C);
+  const rgb = convert(C);
   if (inGamut(rgb)) return rgb;
-  // binary search for the largest chroma that fits, like browsers' gamut mapping
+
+  // like browsers: keep lightness and hue, shrink chroma until the color fits sRGB
   let lo = 0;
   let hi = C;
   for (let i = 0; i < 20; i++) {
@@ -60,6 +56,5 @@ function oklchToSrgb(L: number, C: number, H: number): [number, number, number] 
     if (inGamut(convert(mid))) lo = mid;
     else hi = mid;
   }
-  rgb = convert(lo);
-  return rgb;
+  return convert(lo);
 }
