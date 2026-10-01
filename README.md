@@ -1,5 +1,7 @@
 # just-ai-avatar
 
+**[Live playground →](https://just-ai-avatar.vercel.app)**
+
 Glowing AI avatars in plain HTML + CSS, as a Preact component. No images, no SVG, no stylesheet:
 every part is a div with inline styles, so it also renders to static HTML.
 
