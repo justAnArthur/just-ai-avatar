@@ -1,4 +1,5 @@
 import type { Colors } from './colors.ts';
+import { type EmotionFrame, type EyeMod, buildEmotion, emotionName } from './emotions.ts';
 import { type AvatarOptions, type Resolved, resolve } from './options.ts';
 import { BODIES, type BodyDef, type Box, EYES, type EyeDef, type Shape, TILES } from './shapes.ts';
 
@@ -7,6 +8,8 @@ export interface EyeLayout {
   /** Eye box in tile units (0–100); it rotates around its own center. */
   box: Box;
   rotate: number;
+  /** How the current emotion changes this eye (empty when calm). */
+  mod: EyeMod;
 }
 
 /**
@@ -27,6 +30,8 @@ export interface Layout {
   blur: { core: number; shade: number; glow: number };
   /** Multiplier for eye outline / glow sizes. */
   scale: number;
+  /** The active emotion, if any. */
+  emotion: EmotionFrame | null;
 }
 
 export function layout(input: AvatarOptions = {}): Layout {
@@ -53,8 +58,25 @@ export function layout(input: AvatarOptions = {}): Layout {
     const h = def.h * s * o.eyeScale;
     const cx = fx + side * half * Math.cos(t) + o.gazeX * 4 * s;
     const cy = fy - side * half * Math.sin(t) + o.gazeY * 3 * s;
-    return { def, box: { x: cx - w / 2, y: cy - h * (def.arc ? 0.3 : 0.5), w, h }, rotate: -o.tilt };
+    return { def, box: { x: cx - w / 2, y: cy - h * (def.arc ? 0.3 : 0.5), w, h }, rotate: -o.tilt, mod: {} };
   }) as [EyeLayout, EyeLayout];
+
+  const name = emotionName(o.emotion);
+  const emotion = name
+    ? buildEmotion(
+        name,
+        {
+          colors: o.colors,
+          s,
+          face: { x: fx, y: fy },
+          eyes: eyes.map(({ box: b }) => ({ cx: b.x + b.w / 2, cy: b.y + b.h / 2, w: b.w, h: b.h })) as never,
+          tilt: o.tilt,
+        },
+        o.seedKey,
+        o.emotionVariant,
+      )
+    : null;
+  if (emotion) eyes.forEach((e, i) => (e.mod = emotion.eyes[i]!));
 
   return {
     options: o,
@@ -67,5 +89,6 @@ export function layout(input: AvatarOptions = {}): Layout {
     eyes,
     blur: { core: 6.5 * s, shade: 5 * s, glow: 0.7 },
     scale: s,
+    emotion,
   };
 }

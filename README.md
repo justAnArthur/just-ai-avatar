@@ -57,6 +57,42 @@ Without JSX, as a web component:
 <ai-avatar seed="agent-42" body="triangle" eyes="oval happy" animate="blink"></ai-avatar>
 ```
 
+## Emotions
+
+Twelve animated emotions: `happy` `laugh` `love` `wink` `surprised` `scared` `sad` `crying` `angry` `sleepy`
+`dizzy` `thinking`. Eyes morph (squash, slant, close, turn into hearts, X's, spirals), a mouth appears, and
+extras pop in (tears, sweat drops, hearts, Zzz, anger vein, stars, "!" and "?"). Each emotion has a few
+variants and **the seed picks one**, so two avatars never look scared in quite the same way, while one avatar
+always does it the same way.
+
+Aliases for app events: `error`/`fear`/`warning` → scared, `success`/`done` → happy, `loading`/`wait` →
+thinking, `fail` → sad, `idle` → sleepy, `confused` → dizzy, and more (`EMOTION_ALIASES`).
+
+Preact:
+
+```tsx
+import { Avatar, useEmotion } from '@justanarthur/just-ai-avatar';
+
+const mood = useEmotion();
+<Avatar seed="support-bot" emotion={mood.emotion} emotionKey={mood.emotionKey} />
+
+fetch('/api').catch(() => mood.emote('error'));  // plays for its natural length, then calms down
+mood.emote('thinking', Infinity);                 // hold until mood.calm()
+```
+
+Web component:
+
+```js
+const bot = document.querySelector('ai-avatar');
+window.addEventListener('error', () => bot.emote('error'));
+bot.emote('love', { duration: 3000 });
+bot.calm();
+// or hold one declaratively: <ai-avatar seed="bot" emotion="sleepy"></ai-avatar>
+```
+
+`emotion` also works in `renderAvatarHTML` and `renderAvatarSVG` (a static frame), and `emotionVariant`
+forces a specific variant.
+
 ## Export: SVG, PNG, JPEG
 
 `renderAvatarSVG` draws the same avatar as real vector shapes (paths, gradients, blur filters, hex colors

@@ -1,3 +1,4 @@
+import { EMOTION_KEYFRAMES, type Part, cutPolygon, partTransform } from './emotions.ts';
 import { layout } from './layout.ts';
 import type { AvatarOptions } from './options.ts';
 import { rngFromSeed } from './options.ts';
@@ -8,6 +9,8 @@ type CSS = Record<string, string | number | undefined>;
 export type AvatarProps = AvatarOptions & {
   class?: string;
   style?: CSS;
+  /** Change it to replay the same emotion (`useEmotion()` does this for you). */
+  emotionKey?: string | number;
 };
 
 const f = (n: number) => +n.toFixed(3);
@@ -24,7 +27,7 @@ export const KEYFRAMES =
 const place = (b: Box): CSS => ({ position: 'absolute', left: pct(b.x), top: pct(b.y), width: pct(b.w), height: pct(b.h) });
 
 /** Glowing AI avatar. Every part is a div with inline styles; no stylesheet needed. */
-export function Avatar({ class: className, style: extraStyle, ...options }: AvatarProps) {
+export function Avatar({ class: className, style: extraStyle, emotionKey, ...options }: AvatarProps) {
   const L = layout(options);
   const { colors: c, body, scale: s } = L;
   const o = L.options;
@@ -52,7 +55,10 @@ export function Avatar({ class: className, style: extraStyle, ...options }: Avat
     ...extraStyle,
   };
 
-  const eyes = L.eyes.map(({ def, box, rotate }, i) => {
+  const em = L.emotion;
+  const emKey = em ? `${em.name}-${em.variant}-${emotionKey ?? ''}` : 'calm';
+
+  const eyes = L.eyes.map(({ def, box, rotate, mod }, i) => {
     const blink = moving('blink') && !def.arc;
     const inner: CSS = def.arc
       ? {
@@ -73,14 +79,26 @@ export function Avatar({ class: className, style: extraStyle, ...options }: Avat
         };
     return (
       <div key={i} style={{ ...place(box), transform: `rotate(${f(rotate)}deg)` }}>
-        <div data-aiav-anim={blink ? '' : undefined} style={inner} />
+        {/* the emotion reshapes the eye here; transitions make it morph back and forth */}
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            transform: `translate(${cq(mod.offset?.[0] ?? 0)},${cq(mod.offset?.[1] ?? 0)}) scale(${(mod.scale?.[0] ?? 1) * (mod.hide ? 0.4 : 1)},${(mod.scale?.[1] ?? 1) * (mod.hide ? 0.4 : 1)})`,
+            clipPath: `polygon(${cutPolygon(mod.cut, i === 0).map(([x, y]) => `${f(x * 100)}% ${f(y * 100)}%`).join(',')})`,
+            opacity: mod.hide ? 0 : 1,
+            transition: 'transform .35s cubic-bezier(.3,1.4,.5,1),clip-path .35s ease,opacity .2s ease',
+          }}
+        >
+          <div data-aiav-anim={blink ? '' : undefined} style={inner} />
+        </div>
       </div>
     );
   });
 
   return (
     <>
-      {o.animate.length > 0 && <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />}
+      {(o.animate.length > 0 || em) && <style dangerouslySetInnerHTML={{ __html: em ? KEYFRAMES + EMOTION_KEYFRAMES : KEYFRAMES }} />}
       <div class={className ? `ai-avatar ${className}` : 'ai-avatar'} role="img" aria-label={o.label} style={tile}>
         <div
           data-aiav-anim={moving('float') ? '' : undefined}
@@ -90,6 +108,10 @@ export function Avatar({ class: className, style: extraStyle, ...options }: Avat
             animation: moving('float') ? `aiav-float 5s ease-in-out ${delay} infinite` : undefined,
           }}
         >
+          <div
+            data-aiav-anim={em?.motion ? '' : undefined}
+            style={{ position: 'absolute', inset: 0, transformOrigin: '50% 75%', animation: em?.motion }}
+          >
           {/* glow follows whatever shape the body is clipped to */}
           <div style={{ position: 'absolute', inset: 0, filter: `drop-shadow(0 0 ${cq(L.blur.glow * 2)} rgb(255 255 255 / .75))` }}>
             <div style={{ ...place(body), overflow: 'hidden', background: c.rim, ...shapeStyle(body.shape, body.w, body.h) }}>
@@ -111,6 +133,18 @@ export function Avatar({ class: className, style: extraStyle, ...options }: Avat
                   filter: `blur(${cq(L.blur.shade)})`,
                 }}
               />
+              {em?.blobs.map((b, i) => (
+                <div
+                  key={`${emKey}-blob${i}`}
+                  style={{
+                    ...place(inBody({ x: b.x - b.w / 2, y: b.y - b.h / 2, w: b.w, h: b.h })),
+                    borderRadius: '50%',
+                    background: b.color,
+                    filter: `blur(${cq(b.blur)})`,
+                    animation: 'aiav-fade .4s ease-out both',
+                  }}
+                />
+              ))}
             </div>
           </div>
           <div
@@ -122,9 +156,49 @@ export function Avatar({ class: className, style: extraStyle, ...options }: Avat
             }}
           >
             {eyes}
+            {em && <Overlay parts={em.parts.filter((p) => p.layer === 'face')} glow={c.eyeGlow} id={`${emKey}-face`} />}
+          </div>
+          {em && <Overlay parts={em.parts.filter((p) => p.layer === 'fx')} glow={c.eyeGlow} id={`${emKey}-fx`} />}
           </div>
         </div>
       </div>
     </>
+  );
+}
+
+/** Emotion parts in tile units, drawn in an SVG layer that covers the tile. */
+function Overlay({ parts, glow, id }: { parts: Part[]; glow: string; id: string }) {
+  if (!parts.length) return null;
+  return (
+    <svg
+      key={id}
+      viewBox="0 0 100 100"
+      aria-hidden="true"
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', filter: `drop-shadow(0 0 ${cq(0.8)} ${glow})` }}
+    >
+      {parts.map((p, i) => (
+        <g
+          key={i}
+          data-aiav-anim={p.anim ? '' : undefined}
+          style={{
+            animation: p.anim,
+            transformBox: p.origin ? 'view-box' : 'fill-box',
+            transformOrigin: p.origin ? `${f(p.origin[0])}px ${f(p.origin[1])}px` : 'center',
+          }}
+        >
+          <path
+            d={p.d}
+            transform={partTransform(p.at)}
+            fill={p.fill ?? 'none'}
+            stroke={p.stroke}
+            stroke-width={p.width}
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-dasharray={p.dash?.join(' ')}
+            opacity={p.opacity}
+          />
+        </g>
+      ))}
+    </svg>
   );
 }

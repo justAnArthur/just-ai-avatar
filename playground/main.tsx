@@ -7,6 +7,8 @@ import {
   BODIES,
   type BodyName,
   DEFAULTS,
+  EMOTIONS,
+  type EmotionName,
   EYES,
   EYE_PAIRS,
   type Motion,
@@ -16,6 +18,7 @@ import {
   type TileName,
   optionsFromSeed,
   paletteColors,
+  useEmotion,
 } from '../src/index.ts';
 import { type ExportFormat, downloadAvatar } from '../src/export.ts';
 import { renderAvatarHTML } from '../src/server.ts';
@@ -124,6 +127,10 @@ function App() {
   const [downloading, setDownloading] = useState<ExportFormat | null>(null);
   const [gallery, setGallery] = useState(() => Array.from({ length: 18 }, randomSeed));
   const [dark, setDark] = useState(() => matchMedia('(prefers-color-scheme: dark)').matches);
+  const mood = useEmotion();
+  const [hold, setHold] = useState(false);
+  const feel = (e: EmotionName) => mood.emote(e, hold ? Infinity : undefined);
+  const moodProps = { emotion: mood.emotion, emotionKey: mood.emotionKey };
 
   useEffect(() => { document.documentElement.classList.toggle('dark', dark); }, [dark]);
 
@@ -190,7 +197,7 @@ function App() {
           >
             <div class="flex flex-col items-center gap-10 px-4 pt-14 pb-8">
               <div class="grid h-[320px] place-items-center">
-                <Avatar {...state} size={size} />
+                <Avatar {...state} size={size} {...moodProps} />
               </div>
               <div class="w-full max-w-[460px]">
                 <InputMessage
@@ -203,6 +210,31 @@ function App() {
                   minRows={1}
                   maxRows={2}
                 />
+              </div>
+            </div>
+          </Card>
+
+          <Card
+            caption={mood.emotion ? `Feeling ${mood.emotion} · the seed picks how it looks` : 'Emotions · the seed picks how each one looks'}
+            action={
+              <div class="flex items-center gap-3">
+                <Switch label="Hold" checked={hold} onToggle={() => { setHold((h) => !h); mood.calm(); }} size="compact" />
+              </div>
+            }
+          >
+            <div class="flex flex-col gap-3 p-3">
+              <div class="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-1.5">
+                {EMOTIONS.map((e) => (
+                  <Button key={e} size="compact" variant={mood.emotion === e ? 'primary' : 'secondary'} onClick={() => feel(e)}>
+                    {e}
+                  </Button>
+                ))}
+              </div>
+              <div class="flex flex-wrap items-center justify-between gap-2 text-[13px] text-muted-foreground">
+                <span>Trigger one from your app: <code class="text-foreground">mood.emote('error')</code></span>
+                <Button size="compact" variant="ghost" onClick={() => fetch('/this-request-fails').then((r) => { if (!r.ok) throw r; }).catch(() => mood.emote('error'))}>
+                  Simulate a failed request
+                </Button>
               </div>
             </div>
           </Card>
@@ -262,7 +294,7 @@ function App() {
                   onClick={() => applySeed(s)}
                   class="flex cursor-pointer flex-col items-center gap-1.5 rounded-xl px-1 pt-2.5 pb-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-[var(--hover)] hover:text-foreground"
                 >
-                  <Avatar seed={s} size={60} />
+                  <Avatar seed={s} size={60} {...moodProps} />
                   <span class="max-w-full truncate">{s}</span>
                 </button>
               ))}

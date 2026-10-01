@@ -1,4 +1,5 @@
 import { toHex } from './color-convert.ts';
+import { cutPolygon, partTransform } from './emotions.ts';
 import { layout } from './layout.ts';
 import { type AvatarOptions, rngFromSeed } from './options.ts';
 import { type Box, polygonCorners, type Shape } from './shapes.ts';
@@ -98,27 +99,67 @@ export function renderAvatarSVG(options: AvatarOptions = {}, svgOptions: SvgOpti
       `<feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`,
   ];
 
-  const eyes = L.eyes.map(({ def, box: b, rotate }, i) => {
+  const eyes = L.eyes.map(({ def, box: b, rotate, mod }, i) => {
+    if (mod.hide) return '';
     const cx = b.x + b.w / 2;
     const cy = b.y + b.h / 2;
-    const transform = `rotate(${n(rotate)} ${n(cx)} ${n(cy)})`;
+    const [sx, sy] = mod.scale ?? [1, 1];
+    const [dx, dy] = mod.offset ?? [0, 0];
+    // same order as the HTML: rotate with the head, then the emotion's shift and squash
+    const transform =
+      `rotate(${n(rotate)} ${n(cx)} ${n(cy)})` +
+      (dx || dy ? ` translate(${n(dx)} ${n(dy)})` : '') +
+      (sx !== 1 || sy !== 1 ? ` translate(${n(cx)} ${n(cy)}) scale(${n(sx)} ${n(sy)}) translate(${n(-cx)} ${n(-cy)})` : '');
+    let clip = '';
+    if (mod.cut) {
+      const pts = cutPolygon(mod.cut, i === 0).map(([px, py]) => `${n(b.x + px * b.w)},${n(b.y + py * b.h)}`).join(' ');
+      defs.push(`<clipPath id="${id}-cut${i}"><polygon points="${pts}"/></clipPath>`);
+      clip = ` clip-path="url(#${id}-cut${i})"`;
+    }
     if (def.arc) {
       const t = b.w * 0.22;
       defs.push(`<clipPath id="${id}-arc${i}"><rect x="${n(b.x - 1)}" y="${n(b.y - 1)}" width="${n(b.w + 2)}" height="${n(b.h * 0.48 + 1)}"/></clipPath>`);
       return (
-        `<g transform="${transform}"><ellipse cx="${n(cx)}" cy="${n(cy)}" rx="${n(b.w / 2 - t / 2)}" ry="${n(b.h / 2 - t / 2)}" ` +
-        `fill="none" ${paint('stroke', c.eyeMid)} stroke-width="${n(t)}" clip-path="url(#${id}-arc${i})"/></g>`
+        `<g transform="${transform}"><g${clip}><ellipse cx="${n(cx)}" cy="${n(cy)}" rx="${n(b.w / 2 - t / 2)}" ry="${n(b.h / 2 - t / 2)}" ` +
+        `fill="none" ${paint('stroke', c.eyeMid)} stroke-width="${n(t)}" clip-path="url(#${id}-arc${i})"/></g></g>`
       );
     }
     const d = radiusPath(def.radius ?? '50%', b);
     return (
-      `<g transform="${transform}">` +
+      `<g transform="${transform}"><g${clip}>` +
       `<path d="${d}" ${paint('fill', c.eyeGlow)} ${paint('stroke', c.eyeGlow)} stroke-width="${n(1 * s)}" filter="url(#${id}-eye-glow)"/>` +
       `<path d="${d}" fill="none" ${paint('stroke', c.eyeLine)} stroke-width="${n(0.6 * s)}"/>` +
       `<path d="${d}" fill="url(#${id}-eye)"/>` +
-      `</g>`
+      `</g></g>`
     );
   });
+
+  const em = L.emotion;
+  const blobs = (em?.blobs ?? []).map((bl, i) => {
+    defs.push(blurFilter(`${id}-blob${i}`, bl.blur));
+    return `<ellipse cx="${n(bl.x)}" cy="${n(bl.y)}" rx="${n(bl.w / 2)}" ry="${n(bl.h / 2)}" ${paint('fill', bl.color)} filter="url(#${id}-blob${i})"/>`;
+  });
+  let overlay = '';
+  if (em?.parts.length) {
+    // neon glow like the HTML layer's drop-shadow
+    const { hex, alpha } = toHex(c.eyeGlow);
+    defs.push(
+      `<filter id="${id}-fx-glow" filterUnits="userSpaceOnUse" x="-50" y="-50" width="200" height="200">` +
+        `<feGaussianBlur in="SourceAlpha" stdDeviation="0.8" result="b"/><feFlood flood-color="${hex}" flood-opacity="${n(alpha)}"/>` +
+        `<feComposite in2="b" operator="in" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`,
+    );
+    const parts = em.parts.map((p) => {
+      const t = partTransform(p.at);
+      return (
+        `<path d="${p.d}"${t ? ` transform="${t}"` : ''} ${p.fill ? paint('fill', p.fill) : 'fill="none"'}` +
+        (p.stroke ? ` ${paint('stroke', p.stroke)} stroke-width="${n(p.width ?? 1)}" stroke-linecap="round" stroke-linejoin="round"` : '') +
+        (p.dash ? ` stroke-dasharray="${p.dash.join(' ')}"` : '') +
+        (p.opacity != null ? ` opacity="${n(p.opacity)}"` : '') +
+        '/>'
+      );
+    });
+    overlay = `<g filter="url(#${id}-fx-glow)">${parts.join('')}</g>`;
+  }
 
   const sh = L.shade;
   const label = L.options.label.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
@@ -132,8 +173,10 @@ export function renderAvatarSVG(options: AvatarOptions = {}, svgOptions: SvgOpti
     `<path d="${bodyPath}" ${paint('fill', c.rim)}/>` +
     `<path d="${corePath}" fill="url(#${id}-core)" filter="url(#${id}-core-blur)"/>` +
     `<ellipse cx="${n(sh.x + sh.w / 2)}" cy="${n(sh.y + sh.h / 2)}" rx="${n(sh.w / 2)}" ry="${n(sh.h / 2)}" ${paint('fill', c.shade)} filter="url(#${id}-shade-blur)"/>` +
+    blobs.join('') +
     `</g></g>` +
     eyes.join('') +
+    overlay +
     `</g></svg>`
   );
 }

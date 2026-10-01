@@ -1,4 +1,5 @@
 import { type Colors, type PaletteName, colorsFromHue, paletteColors } from './colors.ts';
+import type { EmotionInput } from './emotions.ts';
 import { BODIES, type BodyName, EYES, EYE_PAIRS, type EyeName, type EyePairName, type TileName } from './shapes.ts';
 
 export type Motion = 'blink' | 'float' | 'look';
@@ -29,6 +30,10 @@ export interface AvatarOptions {
   gazeY?: number;
   animate?: boolean | Motion[];
   label?: string;
+  /** Show an emotion (stays until cleared). Use `useEmotion()` or `el.emote()` to play one for a moment. */
+  emotion?: EmotionInput | null;
+  /** Force an emotion variant instead of the one the seed picks. */
+  emotionVariant?: number;
 }
 
 export const DEFAULTS = {
@@ -46,9 +51,13 @@ export const DEFAULTS = {
   gazeY: 0,
   animate: [],
   label: 'AI avatar',
-} satisfies Required<Omit<AvatarOptions, 'seed' | 'colors'>>;
+} satisfies Required<Omit<AvatarOptions, 'seed' | 'colors' | 'emotion' | 'emotionVariant'>>;
 
-export interface Resolved extends Required<Omit<AvatarOptions, 'seed' | 'eyes' | 'animate' | 'hue'>> {
+export interface Resolved extends Required<Omit<AvatarOptions, 'seed' | 'eyes' | 'animate' | 'hue' | 'emotion' | 'emotionVariant'>> {
+  /** Stable identity used to pick emotion variants: the seed, or the look itself. */
+  seedKey: string;
+  emotion?: AvatarOptions['emotion'];
+  emotionVariant?: number;
   hue: number | null;
   eyes: [EyeName, EyeName];
   animate: Motion[];
@@ -111,5 +120,6 @@ export function resolve(input: AvatarOptions = {}): Resolved {
     colors,
     eyes,
     animate,
+    seedKey: given.seed ?? [o.hue ?? o.palette, o.body, eyes.join('+'), o.tilt, o.spacing].join('|'),
   };
 }
