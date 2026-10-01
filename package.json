@@ -1,0 +1,43 @@
+{
+  "name": "just-ai-avatar",
+  "version": "0.2.0",
+  "description": "Glowing AI avatars in plain HTML + CSS, as a Preact component",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./element": "./src/element.ts"
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "scripts": {
+    "dev": "bun --hot ./playground/index.html",
+    "build": "bun build ./src/index.ts ./src/server.ts ./src/element.ts --outdir dist --splitting --target browser --external preact --external preact-render-to-string --minify",
+    "build:playground": "bun scripts/build-playground.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "preact": "^11.0.0"
+  },
+  "dependencies": {
+    "preact-render-to-string": "^6.8.0"
+  },
+  "devDependencies": {
+    "@base-ui/react": "^1.8.0",
+    "@types/bun": "^1.4.2",
+    "bun-plugin-tailwind": "^0.1.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^13.4.6",
+    "lucide-react": "^1.49.0",
+    "pdfjs-dist": "^6.3.289",
+    "react": "npm:@preact/compat",
+    "react-dom": "npm:@preact/compat",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2"
+  }
+}

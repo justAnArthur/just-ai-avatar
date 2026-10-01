@@ -1,0 +1,10 @@
+{
+  // The Fluid Functionalism components are written against React's types and run on
+  // preact/compat. They work at runtime, but their types don't line up exactly with
+  // Preact's, so the playground is type-checked loosely and kept out of `bun run typecheck`.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "strict": false
+  },
+  "include": ["."]
+}
