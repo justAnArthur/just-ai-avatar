@@ -1,0 +1,18 @@
+{
+  "ref": "v1.0.1",
+  "installedAt": "2026-10-01T09:29:29.801Z",
+  "workflows": {
+    "bump-version.yml": {
+      "name": "bump-version",
+      "file": "bump-version.yml",
+      "ref": "v1.0.1",
+      "installedAt": "2026-10-01T09:29:29.801Z"
+    },
+    "publish-npm-on-tag.yml": {
+      "name": "publish-npm-on-tag",
+      "file": "publish-npm-on-tag.yml",
+      "ref": "v1.0.1",
+      "installedAt": "2026-10-01T09:29:29.801Z"
+    }
+  }
+}
