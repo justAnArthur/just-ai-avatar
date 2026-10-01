@@ -2,8 +2,9 @@
 
 **[Live playground →](https://just-ai-avatar.vercel.app)**
 
-Glowing AI avatars in plain HTML + CSS, as a Preact component. No images, no SVG, no stylesheet:
-every part is a div with inline styles, so it also renders to static HTML.
+AI avatars in four looks (glow, flat, plush, clay) with accessories and animated moods, as a Preact component.
+No images and no stylesheet: glow is divs with inline styles, the other looks inline SVG, and everything also
+renders to static HTML and SVG.
 
 ```bash
 bun add @justanarthur/just-ai-avatar preact
@@ -38,6 +39,7 @@ import { Avatar } from '@justanarthur/just-ai-avatar';
 <Avatar seed="agent-42" size={96} />                      // same seed → same avatar
 <Avatar body="hexagon" eyes="wink" palette="grape" />
 <Avatar hue={150} body="arch" eyes={['round', 'happy']} />
+<Avatar look="plush" body="cloud" accessories={['beret', 'glasses']} />
 ```
 
 Static HTML (SSR, emails, static sites):
@@ -55,6 +57,30 @@ Without JSX, as a web component:
   defineAvatarElement();
 </script>
 <ai-avatar seed="agent-42" body="triangle" eyes="oval happy"></ai-avatar>
+```
+
+## Looks and accessories
+
+| Look | |
+|---|---|
+| `glow` | the original: a light-filled body cropped by a gradient tile, glowing eyes |
+| `flat` | solid shapes, crisp edges, simple eyes |
+| `plush` | felt toy: fuzzy edge and pile from SVG noise, soft shading, glossy black eyes |
+| `clay` | lit from the top left, soft inner shadow, specular highlight |
+
+Accessories go one per slot and are drawn in the avatar's look (felt in plush, lit in clay, glowing in glow):
+
+- head: `beret` `beanie` `cap` `crown` `halo` `antenna` `sprout` `bow` `headphones`
+- face: `glasses` `shades`
+
+Hats need headroom, so the body moves down to fit them in the tile. `accentHue` colors them; by default it
+complements the body.
+
+A seed picks everything, look and accessories included. Pin what your brand needs and let the seed vary the rest:
+
+```tsx
+<Avatar seed={user.id} look="flat" palette="indigo" />   // every user differs, all flat and indigo
+<Avatar seed={user.id} accessories={[]} />               // no accessories
 ```
 
 ## Moods
@@ -122,13 +148,16 @@ JPEG has no transparency, so the tile's rounded corners are filled with `backgro
 | Option | Values | Default |
 |---|---|---|
 | `seed` | any string | – |
+| `look` | `glow` `flat` `plush` `clay` | `glow` |
+| `accessories` | one name or a list, one per slot (head, face); `[]` for none | `[]` |
+| `accentHue` | 0–359, OKLCH hue of the accessories | complements the body |
 | `size` | px number or any CSS length | `160` |
 | `palette` | `sky` `mint` `lime` `sun` `peach` `coral` `rose` `grape` `indigo` `slate` `night` | `sky` |
 | `hue` | 0–359, OKLCH hue (overrides palette; sky is 233) | – |
 | `saturation` | 0–100 | `100` |
 | `colors` | full override, see `colorsFromHue()` | – |
 | `tile` | `squircle` `rounded` `circle` `square` `none`, or any CSS radius | `squircle` |
-| `body` | `dome` `peek` `wide` `arch` `square` `triangle` `diamond` `hexagon` | `dome` |
+| `body` | `dome` `peek` `wide` `arch` `square` `triangle` `diamond` `hexagon` `cloud` `drop` `bean` | `dome` |
 | `eyes` | `oval` `round` `tall` `dot` `square` `pill` `happy` `wink`, or `[left, right]` | `oval` |
 | `tilt` | head tilt in degrees | `12` |
 | `spacing` / `eyeScale` | multipliers | `1` |
@@ -138,14 +167,19 @@ JPEG has no transparency, so the tile's rounded corners are filled with `backgro
 | `emotionVariant` | force a variant instead of the seed's | – |
 | `label` | accessible name | `AI avatar` |
 
-Explicit options override what a seed picks. Web component attributes use kebab-case (`eye-scale`, `gaze-x`).
+Explicit options override what a seed picks. Web component attributes use kebab-case (`eye-scale`, `gaze-x`,
+`accent-hue`); `accessories="beret glasses"` is space-separated.
 Animations respect `prefers-reduced-motion`.
 
 ## Adding shapes
 
 Bodies live in `src/shapes.ts`. Each one is a box in % of the tile, which must overflow the tile so the tile crops
-it (a test enforces this), plus a shape: a CSS `radius`, or polygon `points` with a `round` corner size.
-`core` is the glow inside the body and `face` is the point between the eyes.
+it (a test enforces this), plus a shape: a CSS `radius`, polygon `points` with a `round` corner size (one, or one
+per corner), or `lobes`, a union of circles. `core` is the glow inside the body, `face` is the point between the
+eyes and `crown` the top of the head, where hats sit.
+
+Accessories live in `src/accessories.ts`: paths in their own units, each with a role (`fill`, `trim`, `gold`,
+`leaf`, `lens`, `glass`, `frame`, `shine`) that every look turns into its own material.
 
 ```ts
 pentagon: {

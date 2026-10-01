@@ -13,7 +13,8 @@ export type Colors = {
   eyeGlow: string;
 };
 
-export type Palette = { hue: number; saturation?: number } | { colors: Colors };
+/** `colors` replaces the glow colors; the other looks still derive from `hue`. */
+export type Palette = { hue: number; saturation?: number; colors?: Colors };
 
 export const PALETTES = {
   sky: { hue: 233 },
@@ -27,6 +28,7 @@ export const PALETTES = {
   indigo: { hue: 270 },
   slate: { hue: 250, saturation: 22 },
   night: {
+    hue: 280,
     colors: {
       bgTop: '#2b2f63',
       bgBottom: '#121433',
@@ -49,9 +51,7 @@ export type PaletteName = keyof typeof PALETTES;
 /** Full color set for an OKLCH hue, with the original sky avatar's lightness and chroma. */
 export function colorsFromHue(hue: number, saturation = 100): Colors {
   const k = saturation / 100;
-  // yellows and limes go muddy at the sky avatar's lightness
-  const d = Math.abs(((((hue - 105) % 360) + 540) % 360) - 180);
-  const lift = d < 60 ? 0.11 * Math.cos((d / 60) * (Math.PI / 2)) * k : 0;
+  const lift = yellowLift(hue, k);
 
   const c = (l: number, ch: number, dh: number, a?: number) => {
     const L = l < 0.9 ? Math.min(0.9, l + lift) : l;
@@ -75,7 +75,13 @@ export function colorsFromHue(hue: number, saturation = 100): Colors {
   };
 }
 
+// yellows and limes go muddy at the sky avatar's lightness
+export function yellowLift(hue: number, k = 1): number {
+  const d = Math.abs(((((hue - 105) % 360) + 540) % 360) - 180);
+  return d < 60 ? 0.11 * Math.cos((d / 60) * (Math.PI / 2)) * k : 0;
+}
+
 export function paletteColors(name: PaletteName, saturation?: number): Colors {
   const p: Palette = PALETTES[name] ?? PALETTES.sky;
-  return 'colors' in p ? p.colors : colorsFromHue(p.hue, saturation ?? p.saturation ?? 100);
+  return p.colors ?? colorsFromHue(p.hue, saturation ?? p.saturation ?? 100);
 }

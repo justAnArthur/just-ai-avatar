@@ -4,24 +4,26 @@ import { type EmotionInput, playTime } from './emotions.ts';
 import type { AvatarOptions } from './options.ts';
 
 const ATTRS = {
-  seed: 'seed', size: 'size', palette: 'palette', hue: 'hue', saturation: 'saturation',
+  seed: 'seed', look: 'look', accessories: 'accessories', 'accent-hue': 'accentHue',
+  size: 'size', palette: 'palette', hue: 'hue', saturation: 'saturation',
   tile: 'tile', body: 'body', eyes: 'eyes', tilt: 'tilt', spacing: 'spacing',
   'eye-scale': 'eyeScale', 'gaze-x': 'gazeX', 'gaze-y': 'gazeY', animate: 'animate', label: 'label',
   emotion: 'emotion', 'emotion-variant': 'emotionVariant',
 } as const;
 
-const NUMERIC = new Set(['hue', 'saturation', 'tilt', 'spacing', 'eyeScale', 'gazeX', 'gazeY', 'emotionVariant']);
+const NUMERIC = new Set(['accentHue', 'hue', 'saturation', 'tilt', 'spacing', 'eyeScale', 'gazeX', 'gazeY', 'emotionVariant']);
 
 function parse(key: string, value: string) {
   if (NUMERIC.has(key)) return Number(value);
   if (key === 'size') return /^\d+(\.\d+)?$/.test(value) ? Number(value) : value;
   if (key === 'eyes' && value.includes(' ')) return value.split(/\s+/);
+  if (key === 'accessories') return value.split(/\s+/).filter(Boolean);
   if (key === 'animate') return value !== 'false';
   return value;
 }
 
 /**
- * Registers `<ai-avatar seed="agent-42" body="hexagon" emotion="sleepy">`.
+ * Registers `<ai-avatar seed="agent-42" look="plush" accessories="beret glasses" emotion="sleepy">`.
  * `el.emote('error')` plays an emotion for a moment, `el.calm()` ends it.
  */
 export function defineAvatarElement(tag = 'ai-avatar') {

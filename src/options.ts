@@ -1,10 +1,18 @@
-import { type Colors, type PaletteName, colorsFromHue, paletteColors } from './colors.ts';
+import { type AccessoryName, FACE_ACCESSORIES, HEAD_ACCESSORIES, pickAccessories } from './accessories.ts';
+import { type Colors, PALETTES, type PaletteName, colorsFromHue, paletteColors } from './colors.ts';
 import type { EmotionInput } from './emotions.ts';
+import { LOOKS, type LookName } from './looks.ts';
 import { BODIES, type BodyName, EYES, EYE_PAIRS, type EyeName, type EyePairName, type TileName } from './shapes.ts';
 
 export type AvatarOptions = {
-  /** Any string, e.g. a user id. The same seed always gives the same avatar. */
+  /** Any string, e.g. a user id. The same seed always gives the same avatar; explicit options win over it. */
   seed?: string;
+  /** Rendering: `glow`, `flat`, `plush` or `clay`. Accessories and emotions follow it. */
+  look?: LookName;
+  /** One per slot (head, face); the later wins, `[]` for none. */
+  accessories?: AccessoryName | AccessoryName[];
+  /** OKLCH hue of the accessories; complements the body by default. */
+  accentHue?: number | null;
   /** px number or any CSS length. */
   size?: number | string;
   palette?: PaletteName;
@@ -36,6 +44,9 @@ export type AvatarOptions = {
 
 export const DEFAULTS = {
   size: 160,
+  look: 'glow',
+  accessories: [],
+  accentHue: null,
   palette: 'sky',
   hue: null,
   saturation: 100,
@@ -51,8 +62,12 @@ export const DEFAULTS = {
   label: 'AI avatar',
 } satisfies Required<Omit<AvatarOptions, 'seed' | 'colors' | 'emotion' | 'emotionVariant'>>;
 
-export type Resolved = Required<Omit<AvatarOptions, 'seed' | 'eyes' | 'hue' | 'emotion' | 'emotionVariant'>> & {
+export type Resolved = Required<Omit<AvatarOptions, 'seed' | 'eyes' | 'hue' | 'accentHue' | 'accessories' | 'emotion' | 'emotionVariant'>> & {
   hue: number | null;
+  /** The hue every look derives from, also with a palette. */
+  baseHue: number;
+  accentHue: number;
+  accessories: AccessoryName[];
   eyes: [EyeName, EyeName];
   emotion?: EmotionInput | null;
   emotionVariant?: number;
@@ -76,7 +91,8 @@ export function rngFromSeed(seed: string): () => number {
   };
 }
 
-const SEED_BODIES: BodyName[] = ['dome', 'dome', 'dome', 'peek', 'wide', 'arch', 'square', 'triangle', 'diamond', 'hexagon'];
+const SEED_BODIES: BodyName[] = ['dome', 'dome', 'dome', 'peek', 'wide', 'arch', 'square', 'triangle', 'diamond', 'hexagon', 'cloud', 'drop', 'bean'];
+const ACCENT_OFFSETS = [150, 180, 210, 35, 325];
 const SEED_EYES: NonNullable<AvatarOptions['eyes']>[] = ['oval', 'oval', 'round', 'tall', 'dot', 'square', 'pill', 'happy', 'wink'];
 
 /** The look a seed resolves to. */
@@ -85,7 +101,7 @@ export function optionsFromSeed(seed: string) {
   const pick = <T,>(list: T[]) => list[Math.floor(r() * list.length)]!;
   const range = (min: number, max: number) => Math.round((min + r() * (max - min)) * 100) / 100;
 
-  return {
+  const base = {
     hue: Math.floor(r() * 360),
     body: pick(SEED_BODIES),
     eyes: pick(SEED_EYES),
@@ -94,6 +110,15 @@ export function optionsFromSeed(seed: string) {
     eyeScale: range(0.9, 1.15),
     gazeX: range(-0.6, 0.6),
     gazeY: range(-0.4, 0.4),
+  };
+  // drawn after the original picks, so older seeds keep their hue, eyes and pose
+  const head = r() < 0.5 ? [pick(HEAD_ACCESSORIES)] : [];
+  const face = r() < 0.3 ? [pick(FACE_ACCESSORIES)] : [];
+  return {
+    ...base,
+    look: pick([...LOOKS]),
+    accessories: [...head, ...face],
+    accentHue: (base.hue + pick(ACCENT_OFFSETS)) % 360,
   } satisfies AvatarOptions;
 }
 
@@ -106,11 +131,16 @@ export function resolve(input: AvatarOptions = {}): Resolved {
   const pair = typeof o.eyes === 'string' ? (EYE_PAIRS[o.eyes as EyePairName] ?? [o.eyes, o.eyes]) : o.eyes;
   const eyes = pair.map((e) => (e in EYES ? e : 'oval')) as [EyeName, EyeName];
 
+  const baseHue = o.hue ?? PALETTES[o.palette]?.hue ?? PALETTES.sky.hue;
   return {
     ...o,
+    look: LOOKS.includes(o.look) ? o.look : 'glow',
     body: o.body in BODIES ? o.body : 'dome',
     colors,
     eyes,
+    baseHue,
+    accentHue: o.accentHue ?? (baseHue + 160) % 360,
+    accessories: pickAccessories(o.accessories),
     seedKey: given.seed ?? [o.hue ?? o.palette, o.body, eyes.join('+'), o.tilt, o.spacing].join('|'),
   };
 }

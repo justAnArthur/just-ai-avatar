@@ -1,7 +1,12 @@
+import type { ComponentChildren } from 'preact';
+import { useId } from 'preact/hooks';
 import { EMOTION_KEYFRAMES, type Part, cutPolygon, partTransform } from './emotions.ts';
 import { layout } from './layout.ts';
+import { ok } from './looks.ts';
 import { type AvatarOptions, rngFromSeed } from './options.ts';
+import { accessoryNodes, sceneNodes } from './scene.ts';
 import { type Box, shapeStyle } from './shapes.ts';
+import { type Node, toVNode } from './tree.ts';
 
 type CSS = Record<string, string | number | undefined>;
 
@@ -25,16 +30,56 @@ export const KEYFRAMES =
   '@media (prefers-reduced-motion:reduce){[data-aiav-anim]{animation:none!important}}' +
   EMOTION_KEYFRAMES;
 
-/** Glowing AI avatar made of divs with inline styles. */
+/** AI avatar: the glow look is divs with inline styles, the other looks inline SVG. */
 export const Avatar = ({ class: className, style, emotionKey, ...options }: AvatarProps) => {
   const L = layout(options);
+  // useId restarts with every render-to-string call, so static avatars on one page also need the options hash
+  const id = `aiav${Math.floor(rngFromSeed(JSON.stringify(L.options))() * 1e8).toString(36)}${useId().replace(/\W/g, '')}`;
   const { colors: c, body, scale: s, options: o } = L;
   const em = L.emotion;
   const emKey = em ? `${em.name}-${em.variant}-${emotionKey ?? ''}` : 'calm';
 
+  const frame = (background: string): CSS => ({
+    position: 'relative',
+    display: 'block',
+    overflow: 'hidden',
+    isolation: 'isolate',
+    width: typeof o.size === 'number' ? `${o.size}px` : o.size,
+    aspectRatio: '1',
+    containerType: 'inline-size',
+    borderRadius: L.tileRadius,
+    background,
+    ...style,
+  });
+  const keyframes = o.animate && <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />;
+  const classes = className ? `ai-avatar ${className}` : 'ai-avatar';
+
   const delay = `${f(rngFromSeed(o.seedKey)() * 4)}s`;
   const anim = (value: string | undefined) => (o.animate ? value : undefined);
   const idle = (value: string) => anim(em ? undefined : value);
+
+  // float and emotion motion stay on HTML layers, so filtered SVG (fur, clay) isn't re-rendered every frame
+  const moving = (children: ComponentChildren) => (
+    <div data-aiav-anim style={{ ...cover, animation: anim(`aiav-float 5s ease-in-out ${delay} infinite`) }}>
+      <div data-aiav-anim style={{ ...cover, transformOrigin: '50% 75%', animation: anim(em?.motion) }}>{children}</div>
+    </div>
+  );
+
+  if (o.look !== 'glow') {
+    const [top, bottom] = L.paint.bg;
+    return (
+      <>
+        {keyframes}
+        <div class={classes} role="img" aria-label={o.label} style={frame(L.hasBackground ? `linear-gradient(180deg,${ok(top)},${ok(bottom)})` : 'transparent')}>
+          {moving(
+            <svg viewBox="0 0 100 100" aria-hidden="true" style={{ ...cover, width: '100%', height: '100%', overflow: 'visible' }}>
+              {sceneNodes(L, { id, animate: o.animate, emKey, backdrop: false }).map(toVNode)}
+            </svg>,
+          )}
+        </div>
+      </>
+    );
+  }
 
   const inBody = (b: Box): Box => ({
     x: ((b.x - body.x) / body.w) * 100,
@@ -83,26 +128,10 @@ export const Avatar = ({ class: className, style, emotionKey, ...options }: Avat
 
   return (
     <>
-      {o.animate && <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />}
-      <div
-        class={className ? `ai-avatar ${className}` : 'ai-avatar'}
-        role="img"
-        aria-label={o.label}
-        style={{
-          position: 'relative',
-          display: 'block',
-          overflow: 'hidden',
-          isolation: 'isolate',
-          width: typeof o.size === 'number' ? `${o.size}px` : o.size,
-          aspectRatio: '1',
-          containerType: 'inline-size',
-          borderRadius: L.tileRadius,
-          background: L.hasBackground ? `linear-gradient(180deg,${c.bgTop} 0%,${c.bgBottom} 45%)` : 'transparent',
-          ...style,
-        }}
-      >
-        <div data-aiav-anim style={{ ...cover, animation: anim(`aiav-float 5s ease-in-out ${delay} infinite`) }}>
-          <div data-aiav-anim style={{ ...cover, transformOrigin: '50% 75%', animation: anim(em?.motion) }}>
+      {keyframes}
+      <div class={classes} role="img" aria-label={o.label} style={frame(L.hasBackground ? `linear-gradient(180deg,${c.bgTop} 0%,${c.bgBottom} 45%)` : 'transparent')}>
+        {moving(
+          <>
             <div style={{ ...cover, filter: `drop-shadow(0 0 ${cq(L.blur.glow * 2)} rgb(255 255 255 / .75))` }}>
               <div style={{ ...place(body), overflow: 'hidden', background: c.rim, ...shapeStyle(body.shape, body.w, body.h) }}>
                 <div style={{ ...place(inBody(L.core)), filter: `blur(${cq(L.blur.core)})` }}>
@@ -135,14 +164,23 @@ export const Avatar = ({ class: className, style, emotionKey, ...options }: Avat
             <div data-aiav-anim style={{ ...cover, animation: idle(`aiav-look 7s ease-in-out ${delay} infinite`) }}>
               {eyes}
               {em && <Overlay key={`${emKey}-face`} parts={em.parts.filter((p) => p.layer === 'face')} glow={c.eyeGlow} animate={o.animate} />}
+              <Layer nodes={accessoryNodes(L, 'face', { id: `${id}-f` })} glow={c.eyeGlow} />
             </div>
+            <Layer nodes={accessoryNodes(L, 'head', { id: `${id}-h` })} glow={c.eyeGlow} />
             {em && <Overlay key={`${emKey}-fx`} parts={em.parts.filter((p) => p.layer === 'fx')} glow={c.eyeGlow} animate={o.animate} />}
-          </div>
-        </div>
+          </>,
+        )}
       </div>
     </>
   );
 };
+
+const Layer = ({ nodes, glow }: { nodes: Node[]; glow: string }) =>
+  nodes.length ? (
+    <svg viewBox="0 0 100 100" aria-hidden="true" style={{ ...cover, width: '100%', height: '100%', overflow: 'visible', filter: `drop-shadow(0 0 ${cq(0.8)} ${glow})` }}>
+      {nodes.map(toVNode)}
+    </svg>
+  ) : null;
 
 const Overlay = ({ parts, glow, animate }: { parts: Part[]; glow: string; animate: boolean }) =>
   parts.length ? (

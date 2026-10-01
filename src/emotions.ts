@@ -1,4 +1,3 @@
-import type { Colors } from './colors.ts';
 import { rngFromSeed } from './options.ts';
 
 // emotions are data in tile units: the HTML renderer animates them, the SVG renderer draws a still frame
@@ -79,7 +78,10 @@ export type EmotionFrame = {
 };
 
 export type EmotionContext = {
-  colors: Colors;
+  /** Strokes: closed eyes, mouths, Zzz. */
+  ink: string;
+  /** Inside of an open mouth. */
+  mouth: string;
   s: number;
   face: { x: number; y: number };
   eyes: [EyeBox, EyeBox];
@@ -87,7 +89,7 @@ export type EmotionContext = {
   rnd: () => number;
 };
 
-type EyeBox = { cx: number; cy: number; w: number; h: number };
+export type EyeBox = { cx: number; cy: number; w: number; h: number };
 
 const SHAPES = {
   heart: 'M0 0.9C-0.2 0.75-1 0.25-1-0.3C-1-0.75-0.65-1-0.35-1C-0.15-1 0-0.85 0-0.7C0-0.85 0.15-1 0.35-1C0.65-1 1-0.75 1-0.3C1 0.25 0.2 0.75 0 0.9Z',
@@ -143,8 +145,7 @@ const GOLD = '#ffd84d';
 type Build = (k: Kit) => Omit<EmotionFrame, 'name' | 'variant'>;
 
 function kit(ctx: EmotionContext) {
-  const { colors: c, s, face, eyes, tilt, rnd } = ctx;
-  const ink = c.eyeMid;
+  const { ink, mouth: mouthFill, s, face, eyes, tilt, rnd } = ctx;
   const stroke = 3.4 * s;
   const side = rnd() < 0.5 ? -1 : 1;
 
@@ -168,7 +169,7 @@ function kit(ctx: EmotionContext) {
   const head = { x: face.x, y: Math.max(9, face.y - 30 * s) };
   const outer = (i: 0 | 1) => eyes[i].cx + (i ? 1 : -1) * eyes[i].w * 0.75;
 
-  return { c, s, eyes, face, rnd, side, ink, stroke, eyeStroke, mouth, icon, head, outer, mouthY };
+  return { mouthFill, s, eyes, face, rnd, side, ink, stroke, eyeStroke, mouth, icon, head, outer, mouthY };
 }
 
 type Kit = ReturnType<typeof kit>;
@@ -195,7 +196,7 @@ const VARIANTS: Record<EmotionName, Build[]> = {
     (k) => ({
       eyes: hideBoth,
       parts: [
-        k.eyeStroke(0, SHAPES.arcUp), k.eyeStroke(1, SHAPES.arcUp), k.mouth(grin, 10 * k.s, { fill: k.c.eyeLine }),
+        k.eyeStroke(0, SHAPES.arcUp), k.eyeStroke(1, SHAPES.arcUp), k.mouth(grin, 10 * k.s, { fill: k.mouthFill }),
         k.icon(SHAPES.sparkle, k.outer(k.side > 0 ? 1 : 0) + k.side * 4 * k.s, k.head.y + 4, 3.2, { fill: GOLD, anim: 'aiav-twinkle 1.2s ease-in-out infinite' }),
         k.icon(SHAPES.sparkle, k.outer(k.side > 0 ? 1 : 0) + k.side * 9 * k.s, k.head.y + 11, 2, { fill: GOLD, anim: 'aiav-twinkle 1.2s .4s ease-in-out infinite' }),
       ],
@@ -204,11 +205,11 @@ const VARIANTS: Record<EmotionName, Build[]> = {
     }),
   ],
   laugh: [
-    (k) => ({ eyes: hideBoth, parts: [k.eyeStroke(0, SHAPES.chevronL), k.eyeStroke(1, SHAPES.chevronR), k.mouth(grin, 12 * k.s, { fill: k.c.eyeLine })], blobs: [], motion: 'aiav-m-giggle .18s linear infinite' }),
+    (k) => ({ eyes: hideBoth, parts: [k.eyeStroke(0, SHAPES.chevronL), k.eyeStroke(1, SHAPES.chevronR), k.mouth(grin, 12 * k.s, { fill: k.mouthFill })], blobs: [], motion: 'aiav-m-giggle .18s linear infinite' }),
     (k) => ({
       eyes: hideBoth,
       parts: [
-        k.eyeStroke(0, SHAPES.arcUp), k.eyeStroke(1, SHAPES.arcUp), k.mouth(grin, 12 * k.s, { fill: k.c.eyeLine }),
+        k.eyeStroke(0, SHAPES.arcUp), k.eyeStroke(1, SHAPES.arcUp), k.mouth(grin, 12 * k.s, { fill: k.mouthFill }),
         ...([0, 1] as const).map((i) => k.icon(SHAPES.drop, k.outer(i), k.eyes[i].cy + 2, 2.2, { fill: TEAR, anim: `aiav-drip 1s ${i * 0.3}s ease-in infinite` })),
       ],
       blobs: [],
@@ -237,7 +238,7 @@ const VARIANTS: Record<EmotionName, Build[]> = {
       eyes: hideBoth,
       parts: [
         ...([0, 1] as const).map((i): Part => ({ layer: 'face', d: SHAPES.heart, fill: HEART, at: { x: k.eyes[i].cx, y: k.eyes[i].cy, scale: k.eyes[i].w * 0.55 }, anim: 'aiav-pop .4s cubic-bezier(.3,1.6,.5,1) both' })),
-        k.mouth(grin, 9 * k.s, { fill: k.c.eyeLine }),
+        k.mouth(grin, 9 * k.s, { fill: k.mouthFill }),
         k.icon(SHAPES.heart, k.outer(k.side > 0 ? 1 : 0) + k.side * 5 * k.s, k.head.y + 6, 3, { fill: HEART, anim: 'aiav-rise 1.6s ease-out infinite' }),
       ],
       blobs: [],
@@ -267,7 +268,7 @@ const VARIANTS: Record<EmotionName, Build[]> = {
     (k) => ({
       eyes: [{ scale: [1.3, 1.15], offset: [0, -1] }, { scale: [1.3, 1.15], offset: [0, -1] }],
       parts: [
-        k.mouth(oMouth, 7 * k.s, { fill: k.c.eyeLine }),
+        k.mouth(oMouth, 7 * k.s, { fill: k.mouthFill }),
         ...[-1, 0, 1].map((n) => k.icon('M0-0.6V0.6', k.face.x + n * 7 * k.s, k.head.y + Math.abs(n) * 2, 3, { stroke: k.ink, width: 0.35, at: { x: k.face.x + n * 7 * k.s, y: k.head.y + Math.abs(n) * 2.5, scale: 3 * k.s, rotate: n * 25 } })),
       ],
       blobs: [],
@@ -283,7 +284,7 @@ const VARIANTS: Record<EmotionName, Build[]> = {
     }),
     (k) => ({
       eyes: [{ scale: [1.2, 1.2], offset: [0, -0.5] }, { scale: [1.2, 1.2], offset: [0, -0.5] }],
-      parts: [k.mouth(oMouth, 6 * k.s, { fill: k.c.eyeLine, anim: 'aiav-pop .3s both, aiav-quiver .15s .3s linear infinite' }), sweat(k, 0), sweat(k, 0.5, -1)],
+      parts: [k.mouth(oMouth, 6 * k.s, { fill: k.mouthFill, anim: 'aiav-pop .3s both, aiav-quiver .15s .3s linear infinite' }), sweat(k, 0), sweat(k, 0.5, -1)],
       blobs: [],
       motion: 'aiav-m-tremble .1s linear infinite',
     }),
@@ -321,7 +322,7 @@ const VARIANTS: Record<EmotionName, Build[]> = {
     (k) => ({
       eyes: [{ cut: -0.5, scale: [1, 0.85] }, { cut: -0.5, scale: [1, 0.85] }],
       parts: [
-        k.mouth(oMouth, 6 * k.s, { fill: k.c.eyeLine }),
+        k.mouth(oMouth, 6 * k.s, { fill: k.mouthFill }),
         ...([0, 1] as const).map((i): Part => ({
           layer: 'face', d: `M0 0V${+(100 - k.eyes[i].cy).toFixed(2)}`, stroke: TEAR, width: k.eyes[i].w * 0.45, opacity: 0.85,
           dash: [4, 4], at: { x: k.eyes[i].cx, y: k.eyes[i].cy + k.eyes[i].h * 0.3 }, anim: 'aiav-stream .6s linear infinite',
