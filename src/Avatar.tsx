@@ -1,5 +1,7 @@
-import { type AvatarOptions, resolve, rngFromSeed } from './options.ts';
-import { BODIES, type BodyDef, EYES, type EyeDef, type Shape, TILES, shapeStyle } from './shapes.ts';
+import { layout } from './layout.ts';
+import type { AvatarOptions } from './options.ts';
+import { rngFromSeed } from './options.ts';
+import { type Box, shapeStyle } from './shapes.ts';
 
 type CSS = Record<string, string | number | undefined>;
 
@@ -10,7 +12,7 @@ export type AvatarProps = AvatarOptions & {
 
 const f = (n: number) => +n.toFixed(3);
 const pct = (n: number) => `${f(n)}%`;
-/** 1cqw = 1% of the tile width, so every length scales with the avatar. */
+/** 1cqw = 1% of the tile width = 1 tile unit, so every length scales with the avatar. */
 const cq = (n: number) => `${f(n)}cqw`;
 
 export const KEYFRAMES =
@@ -19,27 +21,23 @@ export const KEYFRAMES =
   '@keyframes aiav-look{0%,35%,100%{transform:translate(0,0)}45%,60%{transform:translate(3.5%,-1%)}70%,85%{transform:translate(-3%,.5%)}}' +
   '@media (prefers-reduced-motion:reduce){[data-aiav-anim]{animation:none!important}}';
 
+const place = (b: Box): CSS => ({ position: 'absolute', left: pct(b.x), top: pct(b.y), width: pct(b.w), height: pct(b.h) });
+
 /** Glowing AI avatar. Every part is a div with inline styles; no stylesheet needed. */
 export function Avatar({ class: className, style: extraStyle, ...options }: AvatarProps) {
-  const o = resolve(options);
-  const c = o.colors;
-  const B: BodyDef = BODIES[o.body];
-  const { box } = B;
-  const s = B.scale;
+  const L = layout(options);
+  const { colors: c, body, scale: s } = L;
+  const o = L.options;
   const moving = (m: string) => o.animate.includes(m as never);
   const delay = `${f(rngFromSeed(JSON.stringify(options))() * 4)}s`;
 
-  // face point in tile %
-  const fx = box.x + (B.face.x * box.w) / 100;
-  const fy = box.y + (B.face.y * box.h) / 100;
-
-  // core box in body %, sized in tile units for shape rounding
-  const core = B.core;
-  const coreShape: Shape = core.shape ?? B.shape;
-
-  // shade behind the eyes: tile units mapped into the body box
-  const shadeW = ((39.8 * s) / box.w) * 100;
-  const shadeH = ((30.9 * s) / box.h) * 100;
+  // core and shade live inside the clipped body, so position them in body %
+  const inBody = (b: Box): Box => ({
+    x: ((b.x - body.x) / body.w) * 100,
+    y: ((b.y - body.y) / body.h) * 100,
+    w: (b.w / body.w) * 100,
+    h: (b.h / body.h) * 100,
+  });
 
   const tile: CSS = {
     position: 'relative',
@@ -49,52 +47,32 @@ export function Avatar({ class: className, style: extraStyle, ...options }: Avat
     width: typeof o.size === 'number' ? `${o.size}px` : o.size,
     aspectRatio: '1',
     containerType: 'inline-size',
-    borderRadius: TILES[o.tile as keyof typeof TILES] ?? o.tile,
-    background: o.tile === 'none' ? 'transparent' : `linear-gradient(180deg,${c.bgTop} 0%,${c.bgBottom} 45%)`,
+    borderRadius: L.tileRadius,
+    background: L.hasBackground ? `linear-gradient(180deg,${c.bgTop} 0%,${c.bgBottom} 45%)` : 'transparent',
     ...extraStyle,
   };
 
-  const half = 13 * o.spacing * s;
-  const t = (o.tilt * Math.PI) / 180;
-
-  const eyes = ([-1, 1] as const).map((side, i) => {
-    const type: EyeDef = EYES[o.eyes[i]!];
-    const w = type.w * s * o.eyeScale;
-    const h = type.h * s * o.eyeScale;
-    const cx = fx + side * half * Math.cos(t) + o.gazeX * 4 * s;
-    const cy = fy - side * half * Math.sin(t) + o.gazeY * 3 * s;
-    const blink = moving('blink') && !type.arc;
-
-    const inner: CSS = type.arc
+  const eyes = L.eyes.map(({ def, box, rotate }, i) => {
+    const blink = moving('blink') && !def.arc;
+    const inner: CSS = def.arc
       ? {
           width: '100%',
           height: '100%',
           boxSizing: 'border-box',
           borderRadius: '50%',
-          border: `${cq(w * 0.22)} solid ${c.eyeMid}`,
+          border: `${cq(box.w * 0.22)} solid ${c.eyeMid}`,
           clipPath: 'inset(0 0 52% 0)',
         }
       : {
           width: '100%',
           height: '100%',
-          borderRadius: type.radius ?? '50%',
+          borderRadius: def.radius ?? '50%',
           background: `linear-gradient(180deg,${c.eyeTop} 0%,${c.eyeMid} 30%,${c.eyeLow} 58%,${c.eyeBottom} 100%)`,
           boxShadow: `0 0 0 ${cq(0.3 * s)} ${c.eyeLine},0 0 ${cq(2.5 * s)} ${cq(0.5 * s)} ${c.eyeGlow}`,
           animation: blink ? `aiav-blink 4.5s ease-in-out ${delay} infinite` : undefined,
         };
-
     return (
-      <div
-        key={i}
-        style={{
-          position: 'absolute',
-          left: pct(cx - w / 2),
-          top: pct(cy - h * (type.arc ? 0.3 : 0.5)),
-          width: pct(w),
-          height: pct(h),
-          transform: `rotate(${f(-o.tilt)}deg)`,
-        }}
-      >
+      <div key={i} style={{ ...place(box), transform: `rotate(${f(rotate)}deg)` }}>
         <div data-aiav-anim={blink ? '' : undefined} style={inner} />
       </div>
     );
@@ -113,48 +91,24 @@ export function Avatar({ class: className, style: extraStyle, ...options }: Avat
           }}
         >
           {/* glow follows whatever shape the body is clipped to */}
-          <div style={{ position: 'absolute', inset: 0, filter: `drop-shadow(0 0 ${cq(1.4)} rgb(255 255 255 / .75))` }}>
-            <div
-              style={{
-                position: 'absolute',
-                overflow: 'hidden',
-                left: pct(box.x),
-                top: pct(box.y),
-                width: pct(box.w),
-                height: pct(box.h),
-                background: c.rim,
-                ...shapeStyle(B.shape, box.w, box.h),
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  left: pct(core.cx - core.w / 2),
-                  top: pct(core.cy - core.h / 2),
-                  width: pct(core.w),
-                  height: pct(core.h),
-                  filter: `blur(${cq(6.5 * s)})`,
-                }}
-              >
+          <div style={{ position: 'absolute', inset: 0, filter: `drop-shadow(0 0 ${cq(L.blur.glow * 2)} rgb(255 255 255 / .75))` }}>
+            <div style={{ ...place(body), overflow: 'hidden', background: c.rim, ...shapeStyle(body.shape, body.w, body.h) }}>
+              <div style={{ ...place(inBody(L.core)), filter: `blur(${cq(L.blur.core)})` }}>
                 <div
                   style={{
                     width: '100%',
                     height: '100%',
                     background: `radial-gradient(circle,${c.core} 0%,${c.core} 60%,${c.coreEdge} 100%)`,
-                    ...shapeStyle(coreShape, (core.w * box.w) / 100, (core.h * box.h) / 100),
+                    ...shapeStyle(L.core.shape, L.core.w, L.core.h),
                   }}
                 />
               </div>
               <div
                 style={{
-                  position: 'absolute',
+                  ...place(inBody(L.shade)),
                   borderRadius: '50%',
-                  left: pct(B.face.x - shadeW / 2),
-                  top: pct(B.face.y - shadeH / 2),
-                  width: pct(shadeW),
-                  height: pct(shadeH),
                   background: c.shade,
-                  filter: `blur(${cq(5 * s)})`,
+                  filter: `blur(${cq(L.blur.shade)})`,
                 }}
               />
             </div>

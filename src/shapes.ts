@@ -121,29 +121,37 @@ export type TileName = keyof typeof TILES;
 
 const f = (n: number) => +n.toFixed(2);
 
+type Pt = readonly [number, number];
+
 /**
- * CSS polygon() with rounded corners. Corners are rounded in real proportions
- * (`w`/`h` are the box size in any unit, `round` is in the same unit), so a
- * non-square box still gets circular-looking corners.
+ * Rounded corners of a polygon whose points are in % of a `w`×`h` box. Each corner
+ * becomes a quadratic Bézier from `s` to `e` with the original corner `p` as control
+ * point. Rounding is done in real proportions (`round` is in the same unit as
+ * `w`/`h`), so a non-square box still gets circular-looking corners.
  */
-export function roundedPolygon(points: [number, number][], w: number, h: number, round: number, steps = 6): string {
+export function polygonCorners(points: [number, number][], w: number, h: number, round: number) {
   const P = points.map(([x, y]) => [(x * w) / 100, (y * h) / 100] as const);
-  const out: string[] = [];
   const n = P.length;
-  for (let i = 0; i < n; i++) {
-    const p = P[i]!;
+  return P.map((p, i) => {
     const a = P[(i - 1 + n) % n]!;
     const b = P[(i + 1) % n]!;
     const da = Math.hypot(a[0] - p[0], a[1] - p[1]);
     const db = Math.hypot(b[0] - p[0], b[1] - p[1]);
     const t = Math.min(round, da / 2, db / 2);
-    const s = [p[0] + ((a[0] - p[0]) / da) * t, p[1] + ((a[1] - p[1]) / da) * t];
-    const e = [p[0] + ((b[0] - p[0]) / db) * t, p[1] + ((b[1] - p[1]) / db) * t];
-    // quadratic Bézier from s to e with the corner as control point
+    const s: Pt = [p[0] + ((a[0] - p[0]) / da) * t, p[1] + ((a[1] - p[1]) / da) * t];
+    const e: Pt = [p[0] + ((b[0] - p[0]) / db) * t, p[1] + ((b[1] - p[1]) / db) * t];
+    return { s, p, e };
+  });
+}
+
+/** CSS polygon() with rounded corners (each Bézier corner sampled into `steps` segments). */
+export function roundedPolygon(points: [number, number][], w: number, h: number, round: number, steps = 6): string {
+  const out: string[] = [];
+  for (const { s, p, e } of polygonCorners(points, w, h, round)) {
     for (let k = 0; k <= steps; k++) {
       const u = k / steps;
-      const x = (1 - u) ** 2 * s[0]! + 2 * (1 - u) * u * p[0] + u ** 2 * e[0]!;
-      const y = (1 - u) ** 2 * s[1]! + 2 * (1 - u) * u * p[1] + u ** 2 * e[1]!;
+      const x = (1 - u) ** 2 * s[0] + 2 * (1 - u) * u * p[0] + u ** 2 * e[0];
+      const y = (1 - u) ** 2 * s[1] + 2 * (1 - u) * u * p[1] + u ** 2 * e[1];
       out.push(`${f((x / w) * 100)}% ${f((y / h) * 100)}%`);
     }
   }

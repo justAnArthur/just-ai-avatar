@@ -1,6 +1,6 @@
 import { render } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { Check, Copy, Moon, Shuffle, Sun } from 'lucide-react';
+import { Check, Copy, Download, Moon, Shuffle, Sun } from 'lucide-react';
 import {
   Avatar,
   type AvatarOptions,
@@ -17,7 +17,9 @@ import {
   optionsFromSeed,
   paletteColors,
 } from '../src/index.ts';
+import { type ExportFormat, downloadAvatar } from '../src/export.ts';
 import { renderAvatarHTML } from '../src/server.ts';
+import { renderAvatarSVG } from '../src/svg.ts';
 import { Button } from '@/components/ui/button';
 import { InputMessage } from '@/components/ui/input-message';
 import { Slider } from '@/components/ui/slider';
@@ -29,7 +31,8 @@ type State = Required<Omit<AvatarOptions, 'seed' | 'colors' | 'size' | 'label' |
   hue: number | null;
   animate: Motion[];
 };
-type ExportTab = 'jsx' | 'element' | 'html';
+type ExportTab = 'jsx' | 'element' | 'html' | 'svg';
+const EXPORT_SIZES = ['256', '512', '1024'] as const;
 
 const WORDS = ['nova', 'pixel', 'echo', 'atlas', 'byte', 'luna', 'orbit', 'sage', 'kiwi', 'zen', 'milo', 'aria',
   'flux', 'juno', 'onyx', 'pip', 'rho', 'iris', 'koda', 'vega', 'nimbus', 'bolt', 'opal', 'quill'];
@@ -117,6 +120,8 @@ function App() {
   const [size, setSize] = useState(240);
   const [tab, setTab] = useState<ExportTab>('jsx');
   const [copied, setCopied] = useState(false);
+  const [exportSize, setExportSize] = useState<(typeof EXPORT_SIZES)[number]>('512');
+  const [downloading, setDownloading] = useState<ExportFormat | null>(null);
   const [gallery, setGallery] = useState(() => Array.from({ length: 18 }, randomSeed));
   const [dark, setDark] = useState(() => matchMedia('(prefers-color-scheme: dark)').matches);
 
@@ -134,6 +139,15 @@ function App() {
   const palette = PALETTES[state.palette];
   const hue = state.hue ?? ('hue' in palette ? palette.hue : 270);
   const code = useMemo(() => exportCode(state, tab), [state, tab]);
+
+  const download = async (format: ExportFormat) => {
+    setDownloading(format);
+    try {
+      await downloadAvatar(state, { format, size: +exportSize, filename: seed ? `avatar-${seed}` : 'avatar' });
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   const copy = async () => {
     await navigator.clipboard.writeText(code).catch(() => {});
@@ -202,11 +216,27 @@ function App() {
             }
           >
             <div class="flex flex-col gap-3 p-3">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <Tabs value={exportSize} onValueChange={(v) => setExportSize(v as typeof exportSize)} size="compact">
+                  <TabsList>
+                    {EXPORT_SIZES.map((px) => <TabItem key={px} value={px} label={`${px}px`} />)}
+                  </TabsList>
+                </Tabs>
+                <div class="flex gap-1.5">
+                  {(['png', 'jpeg', 'svg'] as ExportFormat[]).map((format) => (
+                    <Button key={format} size="compact" variant="secondary" leadingIcon={Download}
+                      loading={downloading === format} onClick={() => download(format)}>
+                      {format.toUpperCase()}
+                    </Button>
+                  ))}
+                </div>
+              </div>
               <Tabs value={tab} onValueChange={(v) => setTab(v as ExportTab)}>
                 <TabsList>
                   <TabItem value="jsx" label="Preact" />
                   <TabItem value="element" label="Web component" />
                   <TabItem value="html" label="Static HTML" />
+                  <TabItem value="svg" label="SVG" />
                 </TabsList>
               </Tabs>
               <pre class="m-0 max-h-60 overflow-auto rounded-xl bg-surface-2 p-3.5 font-mono text-[12px] leading-relaxed break-all whitespace-pre-wrap text-foreground shadow-surface-1">
@@ -336,14 +366,15 @@ const ATTR: Record<string, string> = { eyeScale: 'eye-scale', gazeX: 'gaze-x', g
 function exportCode(state: State, tab: ExportTab): string {
   const opts = changed(state);
   if (tab === 'html') return renderAvatarHTML({ ...state, size: 96 });
+  if (tab === 'svg') return renderAvatarSVG({ ...state, size: 96 });
 
   if (tab === 'element') {
     const attrs = Object.entries(opts).map(([k, v]) => `${ATTR[k] ?? k}="${Array.isArray(v) ? v.join(' ') : v}"`);
-    return `<script type="module">\n  import { defineAvatarElement } from 'just-ai-avatar/element';\n  defineAvatarElement();\n</script>\n\n<ai-avatar size="96"${attrs.map((a) => ` ${a}`).join('')}></ai-avatar>`;
+    return `<script type="module">\n  import { defineAvatarElement } from '@justanarthur/just-ai-avatar/element';\n  defineAvatarElement();\n</script>\n\n<ai-avatar size="96"${attrs.map((a) => ` ${a}`).join('')}></ai-avatar>`;
   }
 
   const props = Object.entries(opts).map(([k, v]) => (typeof v === 'string' ? `${k}="${v}"` : `${k}={${JSON.stringify(v)}}`));
-  return `import { Avatar } from 'just-ai-avatar';\n\n<Avatar size={96}${props.map((p) => ` ${p}`).join('')} />`;
+  return `import { Avatar } from '@justanarthur/just-ai-avatar';\n\n<Avatar size={96}${props.map((p) => ` ${p}`).join('')} />`;
 }
 
 render(<App />, document.getElementById('app')!);
