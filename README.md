@@ -1,35 +1,16 @@
-# just-ai-avatar
+<a href="https://just-ai-avatar.vercel.app"><img src=".github/banner.svg" alt="AI avatars in four looks: Glow, flat, plush and clay, with accessories and animated moods. One Preact component that also renders static HTML and SVG." width="100%"></a>
 
-**[Live playground →](https://just-ai-avatar.vercel.app)**
+# just-ai-avatar
 
 AI avatars in four looks (glow, flat, plush, clay) with accessories and animated moods, as a Preact component.
 No images and no stylesheet: glow is divs with inline styles, the other looks inline SVG, and everything also
 renders to static HTML and SVG.
 
+**[Live playground →](https://just-ai-avatar.vercel.app)**
+
 ```bash
 bun add @justanarthur/just-ai-avatar preact
 ```
-
-Develop:
-
-```bash
-bun install
-bun run dev        # playground at http://localhost:3000
-bun test
-bun run build      # library → dist/
-bun run build:playground
-```
-
-The playground uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components and tokens
-(InputMessage, Slider, Tabs, Switch, Button), installed with the shadcn CLI into `playground/components`.
-They are React components running on Preact through `preact/compat` (`react` is aliased to `@preact/compat`).
-To add another one:
-
-```bash
-bunx --bun shadcn@latest add https://www.fluidfunctionalism.com/r/base/<component>.json
-```
-
-The CLI puts some files in `src/components/ui`; move them to `playground/components/ui`.
 
 ## Use
 
@@ -173,6 +154,30 @@ JPEG has no transparency, so the tile's rounded corners are filled with `backgro
 Explicit options override what a seed picks. Web component attributes use kebab-case (`eye-scale`, `gaze-x`,
 `accent-hue`); `accessories="beret glasses"` is space-separated.
 Animations respect `prefers-reduced-motion`.
+Needs container query units (`cqw`): Chrome 105+, Safari 16+, Firefox 110+.
+
+## How it works
+
+`resolve()` merges the defaults, what the seed picks and your explicit options. `layout()` turns them into
+tile units: body, eyes, accessories and the current emotion frame. Flat, plush and clay are one element tree
+(`scene.ts`, `tree.ts`) that both renderers share, Preact for the live avatar and plain markup for the still
+SVG; glow is divs with inline styles in the component and its own vector version in `svg.ts`.
+
+```mermaid
+flowchart LR
+  O[Options and seed] --> R["resolve()"]
+  R --> L["layout() in tile units"]
+  L --> S[Scene tree for flat, plush, clay]
+  A[Avatar component, Preact]
+  V["renderAvatarSVG()"]
+  L -->|glow| A
+  L -->|glow| V
+  S --> A
+  S --> V
+  A --> H["renderAvatarHTML()"]
+  A --> E[ai-avatar web component]
+  V --> X["avatarToBlob(): PNG, JPEG"]
+```
 
 ## Adding shapes
 
@@ -194,7 +199,28 @@ pentagon: {
 },
 ```
 
-Needs container query units (`cqw`): Chrome 105+, Safari 16+, Firefox 110+.
+## Develop
+
+```bash
+bun install
+bun run dev        # playground at http://localhost:3000
+bun test
+bun run build      # library → dist/
+bun run build:playground
+```
+
+Vercel builds the playground with `bun run build:playground` into `dist/playground` (`vercel.json`).
+
+The playground uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components and tokens
+(InputMessage, Slider, Tabs, Switch, Button), installed with the shadcn CLI into `playground/components`.
+They are React components running on Preact through `preact/compat` (`react` is aliased to `@preact/compat`).
+To add another one:
+
+```bash
+bunx --bun shadcn@latest add https://www.fluidfunctionalism.com/r/base/<component>.json
+```
+
+The CLI puts some files in `src/components/ui`; move them to `playground/components/ui`.
 
 ## Releases
 
@@ -203,3 +229,7 @@ Releases use [just-github-actions-n-workflows](https://github.com/justAnArthur/j
 push to `main` (`fix(avatar): …` → patch, `feat(avatar): …` → minor). The bump tags
 `@justanarthur/just-ai-avatar@x.y.z` and starts the tag workflows itself, which publish to npm and create the
 GitHub release. Publishing needs an `NPM_TOKEN` repository secret.
+
+## License
+
+[MIT](LICENSE)
