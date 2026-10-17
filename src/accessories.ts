@@ -205,15 +205,16 @@ export const ACCESSORIES = {
   tie: {
     slot: 'neck',
     rise: 0,
-    drop: 24,
-    // a collar only under a whole body: at the edge of a cropped one it reads as fangs
+    drop: 26,
+    // a small knot over a long blade that widens to a point; collar tips point down at the knot, so it never reads as a bow
+    // the collar only goes under a whole body: at the edge of a cropped one it reads as fangs
     build: (a) => onNeck(a, [
       ...(a.whole ? [
-        { d: 'M-1-1.5L-9.5-3.2Q-9.2 1.2-5.2 5.6L-1 1.6Z', role: 'trim' as const },
-        { d: 'M1-1.5L9.5-3.2Q9.2 1.2 5.2 5.6L1 1.6Z', role: 'trim' as const },
+        { d: 'M-2.4-1.6L-6.6-2.6Q-7.2-2.7-7-2.1L-3.9 4.4Q-3.6 5-3.3 4.4L-1.6 0.2Z', role: 'collar' as const },
+        { d: 'M2.4-1.6L6.6-2.6Q7.2-2.7 7-2.1L3.9 4.4Q3.6 5 3.3 4.4L1.6 0.2Z', role: 'collar' as const },
       ] : []),
-      { d: 'M-2.2 4.4H2.2L4.4 19.6Q4.6 20.4 4 21L0.6 23.8Q0 24.2-0.6 23.8L-4 21Q-4.6 20.4-4.4 19.6Z', role: 'fill' },
-      { d: 'M-3.4-1.8H3.4Q3.9-1.8 3.8-1.3L2.6 3.4Q2.5 3.8 2.1 3.8H-2.1Q-2.5 3.8-2.6 3.4L-3.8-1.3Q-3.9-1.8-3.4-1.8Z', role: 'fill' },
+      { d: 'M-1.5 4.5H1.5L3.9 21.4Q4 22.1 3.5 22.6L0.5 25.6Q0 26-0.5 25.6L-3.5 22.6Q-4 22.1-3.9 21.4Z', role: 'tie' },
+      { d: 'M-2.6-1.4H2.6Q3.1-1.4 3-0.9L2 3.6Q1.9 4 1.5 4H-1.5Q-1.9 4-2 3.6L-3-0.9Q-3.1-1.4-2.6-1.4Z', role: 'tie' },
     ]),
   },
 } satisfies Record<string, AccessoryDef>;

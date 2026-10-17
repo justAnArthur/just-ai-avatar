@@ -67,6 +67,8 @@ export type Resolved = Required<Omit<AvatarOptions, 'seed' | 'eyes' | 'hue' | 'a
   /** The hue every look derives from, also with a palette. */
   baseHue: number;
   accentHue: number;
+  /** The accent when one is set, the body hue otherwise. */
+  tieHue: number;
   accessories: AccessoryName[];
   eyes: [EyeName, EyeName];
   emotion?: EmotionInput | null;
@@ -140,6 +142,7 @@ export function resolve(input: AvatarOptions = {}): Resolved {
     eyes,
     baseHue,
     accentHue: o.accentHue ?? (baseHue + 160) % 360,
+    tieHue: o.accentHue ?? baseHue,
     accessories: pickAccessories(o.accessories),
     seedKey: given.seed ?? [o.hue ?? o.palette, o.body, eyes.join('+'), o.tilt, o.spacing].join('|'),
   };

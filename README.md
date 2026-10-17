@@ -60,7 +60,8 @@ Accessories go one per slot and are drawn in the avatar's look (felt in plush, l
 - neck: `tie`
 
 Hats need headroom, so the body moves down to fit them in the tile. A tie hangs with a collar from the bottom
-of the `orb`; on cropped bodies only its knot shows at the tile edge. `accentHue` colors them; by default it
+of the `orb`; on cropped bodies only its knot shows at the tile edge. It is a deeper shade of the body unless
+`accentHue` is set. `accentHue` colors them; by default it
 complements the body.
 
 A seed picks everything, look and accessories included. Pin what your brand needs and let the seed vary the rest:

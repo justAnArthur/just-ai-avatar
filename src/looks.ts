@@ -9,7 +9,7 @@ export type LookName = (typeof LOOKS)[number];
 export type Tone = [l: number, c: number, h: number];
 
 /** What an accessory piece is made of; each look turns it into its own material. */
-export type Role = 'fill' | 'trim' | 'gold' | 'leaf' | 'lens' | 'glass' | 'frame' | 'shine';
+export type Role = 'fill' | 'trim' | 'gold' | 'leaf' | 'lens' | 'glass' | 'frame' | 'shine' | 'tie' | 'collar';
 
 export type Paint = {
   bg: [Tone, Tone];
@@ -30,7 +30,8 @@ export function shade([l, c, h]: Tone, dl: number, dc = 0): Tone {
   return [Math.min(1, Math.max(0, l + dl)), Math.max(0, c + dc), h];
 }
 
-export function lookPaint(look: LookName, hue: number, accentHue: number, saturation = 100): Paint {
+/** `tieHue` is the body hue unless an accent is asked for: a tie reads best as a deeper shade of the body. */
+export function lookPaint(look: LookName, hue: number, accentHue: number, saturation = 100, tieHue = hue): Paint {
   const k = saturation / 100;
   const t = (l: number, c: number, h = hue): Tone => {
     const H = ((h % 360) + 360) % 360;
@@ -49,6 +50,8 @@ export function lookPaint(look: LookName, hue: number, accentHue: number, satura
       roles: {
         fill: t(0.97, 0.04, accentHue), trim: t(0.995, 0.008), gold: [0.95, 0.08, 90], leaf: [0.95, 0.07, 145],
         lens: t(0.88, 0.06), glass: [1, 0, 0], frame: t(0.995, 0.01), shine: [1, 0, 0],
+        // the glow body is nearly white, so a pale tie would vanish into it
+        tie: t(0.6, 0.16, tieHue), collar: t(0.995, 0.008),
       },
     };
   }
@@ -70,6 +73,8 @@ export function lookPaint(look: LookName, hue: number, accentHue: number, satura
       glass: [1, 0, 0],
       frame: t(0.22, 0.02),
       shine: [1, 0, 0],
+      tie: t(0.46, 0.14, tieHue),
+      collar: t(0.985, 0.01, tieHue),
     },
   };
 }

@@ -47,7 +47,7 @@ const stops = (list: [number, Tone][]) => list.map(([offset, tone]) => el('stop'
 const blur = (c: Ctx, sd: number) => def(c, `blur${f(sd)}`.replace('.', '_'), (id) => blurFilter(id, sd));
 
 // felt for soft pieces; metal, lenses and frames in plush are glossy like clay
-const SOFT: Role[] = ['fill', 'trim', 'leaf'];
+const SOFT: Role[] = ['fill', 'trim', 'leaf', 'tie', 'collar'];
 
 function material(c: Ctx, role: Role): Record<string, string | number | undefined> {
   const tone = c.L.paint.roles[role];

@@ -65,7 +65,7 @@ export function layout(input: AvatarOptions = {}): Layout {
   const [dx, dy] = rotate(0, B.whole ? box.h / 2 - s : 30 * s, -o.tilt * 0.4);
 
   const glow = o.look === 'glow';
-  const paint = lookPaint(o.look, o.baseHue, o.accentHue, o.saturation);
+  const paint = lookPaint(o.look, o.baseHue, o.accentHue, o.saturation, o.tieHue);
   const name = emotionName(o.emotion);
   const emotion = name
     ? buildEmotion(

@@ -49,7 +49,7 @@ describe('shapes', () => {
       expect(y).toBeGreaterThanOrEqual(0);
       expect(x + w).toBeLessThanOrEqual(100);
       expect(y + h).toBeLessThanOrEqual(100);
-      for (const p of L.accessories.neck) expect(p.at!.y + 24 * p.at!.scale!, `tie tip, tilt ${tilt}`).toBeLessThanOrEqual(100);
+      for (const p of L.accessories.neck) expect(p.at!.y + 26 * p.at!.scale!, `tie tip, tilt ${tilt}`).toBeLessThanOrEqual(100);
       for (const p of L.accessories.head) expect(p.at!.y - 17 * p.at!.scale!, `hat top, tilt ${tilt}`).toBeGreaterThanOrEqual(0);
     }
   });
