@@ -1,4 +1,4 @@
-import type { Piece } from './accessories.ts';
+import type { Piece, Slot } from './accessories.ts';
 import { type EyeMod, cutPolygon, partTransform } from './emotions.ts';
 import type { Layout } from './layout.ts';
 import { type LookName, type Role, type Tone, ok, shade } from './looks.ts';
@@ -74,7 +74,7 @@ function pieceNode(c: Ctx, p: Piece): Node {
   return el('path', { d: p.d, transform: partTransform(p.at), ...attrs });
 }
 
-function pieceNodes(c: Ctx, slot: 'head' | 'face'): Node | null {
+function pieceNodes(c: Ctx, slot: Slot): Node | null {
   const pieces = c.L.accessories[slot];
   if (!pieces.length) return null;
   const solid = c.look === 'plush' || c.look === 'clay';
@@ -220,7 +220,7 @@ function withDefs(c: Ctx, nodes: (Node | Node[] | null | false)[]): Node[] {
 }
 
 /** Accessories for one slot, in the avatar's look; the glow renderer lays them over its divs. */
-export function accessoryNodes(L: Layout, slot: 'head' | 'face', o: SceneOptions): Node[] {
+export function accessoryNodes(L: Layout, slot: Slot, o: SceneOptions): Node[] {
   const c = context(L, o);
   return withDefs(c, L.accessories[slot].map((p) => pieceNode(c, p)));
 }
@@ -230,7 +230,7 @@ function layers(c: Ctx) {
   return {
     back: [bodyNodes(c), blobNodes(c)],
     face: [el('g', anim(c, em ? undefined : `aiav-look 7s ease-in-out ${c.delay} infinite`), eyeNodes(c), partNodes(c, 'face'), pieceNodes(c, 'face'))],
-    front: [pieceNodes(c, 'head'), partNodes(c, 'fx')],
+    front: [pieceNodes(c, 'neck'), pieceNodes(c, 'head'), partNodes(c, 'fx')],
   };
 }
 

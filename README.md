@@ -21,6 +21,7 @@ import { Avatar } from '@justanarthur/just-ai-avatar';
 <Avatar body="hexagon" eyes="wink" palette="grape" />
 <Avatar hue={150} body="arch" eyes={['round', 'happy']} />
 <Avatar look="plush" body="cloud" accessories={['beret', 'glasses']} />
+<Avatar body="orb" tile="none" accessories="tie" />       // a whole orb wearing a tie, no tile
 ```
 
 Static HTML (SSR, emails, static sites):
@@ -56,8 +57,10 @@ Accessories go one per slot and are drawn in the avatar's look (felt in plush, l
 
 - head: `beret` `beanie` `cap` `crown` `halo` `antenna` `sprout` `bow` `headphones`
 - face: `glasses` `shades`
+- neck: `tie`
 
-Hats need headroom, so the body moves down to fit them in the tile. `accentHue` colors them; by default it
+Hats need headroom, so the body moves down to fit them in the tile. A tie hangs with a collar from the bottom
+of the `orb`; on cropped bodies only its knot shows at the tile edge. `accentHue` colors them; by default it
 complements the body.
 
 A seed picks everything, look and accessories included. Pin what your brand needs and let the seed vary the rest:
@@ -65,6 +68,15 @@ A seed picks everything, look and accessories included. Pin what your brand need
 ```tsx
 <Avatar seed={user.id} look="flat" palette="indigo" />   // every user differs, all flat and indigo
 <Avatar seed={user.id} accessories={[]} />               // no accessories
+```
+
+## Whole bodies
+
+Every body is cropped by its tile except `orb`: a full sphere drawn inside the tile. Hats and ties shrink it
+until everything fits, centered, so `tile="none"` gives a free-standing character on any background.
+
+```tsx
+<Avatar body="orb" tile="none" tilt={0} eyes="tall" hue={150} accentHue={150} accessories="tie" />
 ```
 
 ## Moods
@@ -133,7 +145,7 @@ JPEG has no transparency, so the tile's rounded corners are filled with `backgro
 |---|---|---|
 | `seed` | any string | – |
 | `look` | `glow` `flat` `plush` `clay` | `glow` |
-| `accessories` | one name or a list, one per slot (head, face); `[]` for none | `[]` |
+| `accessories` | one name or a list, one per slot (head, face, neck); `[]` for none | `[]` |
 | `accentHue` | 0–359, OKLCH hue of the accessories | complements the body |
 | `size` | px number or any CSS length | `160` |
 | `palette` | `sky` `mint` `lime` `sun` `peach` `coral` `rose` `grape` `indigo` `slate` `night` | `sky` |
@@ -141,7 +153,7 @@ JPEG has no transparency, so the tile's rounded corners are filled with `backgro
 | `saturation` | 0–100 | `100` |
 | `colors` | full override, see `colorsFromHue()` | – |
 | `tile` | `squircle` `rounded` `circle` `square` `none`, or any CSS radius | `squircle` |
-| `body` | `dome` `peek` `wide` `arch` `square` `triangle` `diamond` `hexagon` `cloud` `drop` `bean` | `dome` |
+| `body` | `dome` `peek` `wide` `arch` `square` `triangle` `diamond` `hexagon` `cloud` `drop` `bean` `orb` | `dome` |
 | `eyes` | `oval` `round` `tall` `dot` `square` `pill` `happy` `wink`, or `[left, right]` | `oval` |
 | `tilt` | head tilt in degrees | `12` |
 | `spacing` / `eyeScale` | multipliers | `1` |
@@ -182,7 +194,7 @@ flowchart LR
 ## Adding shapes
 
 Bodies live in `src/shapes.ts`. Each one is a box in % of the tile, which must overflow the tile so the tile crops
-it (a test enforces this), plus a shape: a CSS `radius`, polygon `points` with a `round` corner size (one, or one
+it (a test enforces this) unless it is marked `whole`, plus a shape: a CSS `radius`, polygon `points` with a `round` corner size (one, or one
 per corner), or `lobes`, a union of circles. `core` is the glow inside the body, `face` is the point between the
 eyes and `crown` the top of the head, where hats sit.
 

@@ -1,4 +1,4 @@
-export { ACCESSORIES, FACE_ACCESSORIES, HEAD_ACCESSORIES, type AccessoryName } from './accessories.ts';
+export { ACCESSORIES, FACE_ACCESSORIES, HEAD_ACCESSORIES, NECK_ACCESSORIES, type AccessoryName } from './accessories.ts';
 export { Avatar, KEYFRAMES, type AvatarProps } from './Avatar.tsx';
 export { PALETTES, colorsFromHue, paletteColors, type Colors, type PaletteName } from './colors.ts';
 export {

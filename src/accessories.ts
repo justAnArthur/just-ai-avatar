@@ -10,13 +10,21 @@ export type Anchors = {
   tilt: number;
   face: { x: number; y: number };
   crown: { x: number; y: number };
+  /** Bottom of a whole body, or below the face on a cropped one: where a tie hangs. */
+  neck: { x: number; y: number };
+  /** The body is drawn whole, not cropped by the tile. */
+  whole: boolean;
   eyes: [EyeBox, EyeBox];
 };
 
+export type Slot = 'head' | 'face' | 'neck';
+
 type AccessoryDef = {
-  slot: 'head' | 'face';
+  slot: Slot;
   /** How far it reaches above the crown in its own units; the body moves down to fit it in the tile. */
   rise: number;
+  /** How far it hangs below the neck in its own units; a whole body shrinks to fit it in the tile. */
+  drop?: number;
   build: (a: Anchors) => Piece[];
 };
 
@@ -40,12 +48,20 @@ function eyePair(a: Anchors) {
   return { l, r, gap, rot: -a.tilt, spin: (x: number, y: number) => rotate(x, y, -a.tilt) };
 }
 
-function rotate(x: number, y: number, deg: number): [number, number] {
+export function rotate(x: number, y: number, deg: number): [number, number] {
   const t = (deg * Math.PI) / 180;
   return [x * Math.cos(t) - y * Math.sin(t), x * Math.sin(t) + y * Math.cos(t)];
 }
 
 const n = (v: number) => +v.toFixed(3);
+
+// ties are drawn small like hats, but hang from the neck and swing less with the head
+const TIE = 2;
+
+function onNeck(a: Anchors, pieces: Local[]): Piece[] {
+  const at = { x: a.neck.x, y: a.neck.y, scale: a.s * TIE, rotate: -a.tilt * 0.4 };
+  return pieces.map((p) => ({ ...p, at }));
+}
 
 export const ACCESSORIES = {
   beret: {
@@ -186,6 +202,20 @@ export const ACCESSORIES = {
       ];
     },
   },
+  tie: {
+    slot: 'neck',
+    rise: 0,
+    drop: 24,
+    // a collar only under a whole body: at the edge of a cropped one it reads as fangs
+    build: (a) => onNeck(a, [
+      ...(a.whole ? [
+        { d: 'M-1-1.5L-9.5-3.2Q-9.2 1.2-5.2 5.6L-1 1.6Z', role: 'trim' as const },
+        { d: 'M1-1.5L9.5-3.2Q9.2 1.2 5.2 5.6L1 1.6Z', role: 'trim' as const },
+      ] : []),
+      { d: 'M-2.2 4.4H2.2L4.4 19.6Q4.6 20.4 4 21L0.6 23.8Q0 24.2-0.6 23.8L-4 21Q-4.6 20.4-4.4 19.6Z', role: 'fill' },
+      { d: 'M-3.4-1.8H3.4Q3.9-1.8 3.8-1.3L2.6 3.4Q2.5 3.8 2.1 3.8H-2.1Q-2.5 3.8-2.6 3.4L-3.8-1.3Q-3.9-1.8-3.4-1.8Z', role: 'fill' },
+    ]),
+  },
 } satisfies Record<string, AccessoryDef>;
 
 export type AccessoryName = keyof typeof ACCESSORIES;
@@ -194,6 +224,7 @@ const ALL = ACCESSORIES as Record<AccessoryName, AccessoryDef>;
 
 export const HEAD_ACCESSORIES = (Object.keys(ALL) as AccessoryName[]).filter((k) => ALL[k].slot === 'head');
 export const FACE_ACCESSORIES = (Object.keys(ALL) as AccessoryName[]).filter((k) => ALL[k].slot === 'face');
+export const NECK_ACCESSORIES = (Object.keys(ALL) as AccessoryName[]).filter((k) => ALL[k].slot === 'neck');
 
 /** One per slot, the later wins; unknown names are dropped. */
 export function pickAccessories(input: AccessoryName | AccessoryName[] | undefined): AccessoryName[] {
@@ -207,8 +238,13 @@ export function accessoryRise(names: AccessoryName[]): number {
   return Math.max(0, ...names.map((name) => ALL[name].rise * (ALL[name].slot === 'head' ? HAT : 1)));
 }
 
-export function placeAccessories(names: AccessoryName[], a: Anchors): Record<'head' | 'face', Piece[]> {
-  const placed = { head: [] as Piece[], face: [] as Piece[] };
+/** Tile units below the neck at body scale 1. */
+export function accessoryDrop(names: AccessoryName[]): number {
+  return Math.max(0, ...names.map((name) => (ALL[name].drop ?? 0) * TIE));
+}
+
+export function placeAccessories(names: AccessoryName[], a: Anchors): Record<Slot, Piece[]> {
+  const placed = { head: [] as Piece[], face: [] as Piece[], neck: [] as Piece[] };
   for (const name of names) placed[ALL[name].slot].push(...ALL[name].build(a));
   return placed;
 }

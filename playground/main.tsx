@@ -14,6 +14,7 @@ import {
   EYE_PAIRS,
   FACE_ACCESSORIES,
   HEAD_ACCESSORIES,
+  NECK_ACCESSORIES,
   LOOKS,
   type LookName,
   PALETTES,
@@ -332,6 +333,10 @@ const CustomizeCard = ({ state, set }: { state: State; set: (patch: Partial<Stat
 
         <Section title="Face" value={state.accessories.find((a) => FACE_ACCESSORIES.includes(a)) ?? 'none'}>
           <AccessoryPicker state={state} slot={FACE_ACCESSORIES} set={set} />
+        </Section>
+
+        <Section title="Neck" value={state.accessories.find((a) => NECK_ACCESSORIES.includes(a)) ?? 'none'}>
+          <AccessoryPicker state={state} slot={NECK_ACCESSORIES} set={set} />
         </Section>
 
         <Section title="Accessory color" value={state.accentHue == null ? 'auto' : `hue ${state.accentHue}`}>

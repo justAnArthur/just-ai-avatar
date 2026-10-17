@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { BODIES, EYES, EYE_PAIRS, PALETTES, colorsFromHue, optionsFromSeed, resolve, roundedPolygon } from '../src/index.ts';
+import { BODIES, EYES, EYE_PAIRS, PALETTES, colorsFromHue, layout, optionsFromSeed, resolve, roundedPolygon, type AccessoryName } from '../src/index.ts';
 import { renderAvatarHTML } from '../src/server.ts';
 
 describe('seeds', () => {
@@ -31,13 +31,38 @@ describe('resolve', () => {
 });
 
 describe('shapes', () => {
-  test('every body overflows the tile, so the tile always crops it', () => {
+  test('every body but a whole one overflows the tile, so the tile always crops it', () => {
     for (const [name, b] of Object.entries(BODIES)) {
+      if ('whole' in b) continue;
       const { x, y, w, h } = b.box;
       const overflows = x < 0 || y < 0 || x + w > 100 || y + h > 100;
       expect(overflows, name).toBe(true);
       expect(y + h, `${name} reaches the bottom edge`).toBeGreaterThan(100);
     }
+  });
+  const worn: AccessoryName[][] = [[], ['tie'], ['crown', 'tie'], ['antenna', 'glasses', 'tie']];
+  test.each(worn.map((a) => [a.join(' + ') || 'nothing', a] as const))('a whole body wearing %s stays inside the tile', (_, accessories) => {
+    for (const tilt of [-14, 0, 14]) {
+      const L = layout({ body: 'orb', accessories, tilt });
+      const { x, y, w, h } = L.body;
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(y).toBeGreaterThanOrEqual(0);
+      expect(x + w).toBeLessThanOrEqual(100);
+      expect(y + h).toBeLessThanOrEqual(100);
+      for (const p of L.accessories.neck) expect(p.at!.y + 24 * p.at!.scale!, `tie tip, tilt ${tilt}`).toBeLessThanOrEqual(100);
+      for (const p of L.accessories.head) expect(p.at!.y - 17 * p.at!.scale!, `hat top, tilt ${tilt}`).toBeGreaterThanOrEqual(0);
+    }
+  });
+  test('a tie shrinks a whole body to make room and hangs from its bottom', () => {
+    const plain = layout({ body: 'orb', tilt: 0 });
+    const tied = layout({ body: 'orb', accessories: 'tie', tilt: 0 });
+    expect(tied.body.h).toBeLessThan(plain.body.h);
+    const knot = tied.accessories.neck[0]!.at!;
+    expect(knot.x).toBeCloseTo(50);
+    expect(knot.y).toBeCloseTo(tied.body.y + tied.body.h - tied.scale);
+  });
+  test('the neck slot combines with head and face', () => {
+    expect(resolve({ accessories: ['crown', 'glasses', 'tie'] }).accessories).toEqual(['crown', 'glasses', 'tie']);
   });
   test('rounded polygon has steps+1 points per corner', () => {
     const poly = roundedPolygon([[50, 0], [100, 100], [0, 100]], 100, 100, 10, 4);

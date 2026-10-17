@@ -9,7 +9,7 @@ export type AvatarOptions = {
   seed?: string;
   /** Rendering: `glow`, `flat`, `plush` or `clay`. Accessories and emotions follow it. */
   look?: LookName;
-  /** One per slot (head, face); the later wins, `[]` for none. */
+  /** One per slot (head, face, neck); the later wins, `[]` for none. */
   accessories?: AccessoryName | AccessoryName[];
   /** OKLCH hue of the accessories; complements the body by default. */
   accentHue?: number | null;

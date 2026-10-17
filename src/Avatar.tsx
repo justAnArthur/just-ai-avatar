@@ -164,6 +164,7 @@ export const Avatar = ({ class: className, style, emotionKey, ...options }: Avat
               </div>
             </div>
 
+            <Layer nodes={accessoryNodes(L, 'neck', { id: `${id}-n` })} glow={c.eyeGlow} />
             <div data-aiav-anim style={{ ...cover, animation: idle(`aiav-look 7s ease-in-out ${delay} infinite`) }}>
               {eyes}
               {em && <Overlay key={`${emKey}-face`} parts={em.parts.filter((p) => p.layer === 'face')} glow={c.eyeGlow} animate={o.animate} />}
