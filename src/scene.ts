@@ -229,7 +229,7 @@ function layers(c: Ctx) {
   const em = c.L.emotion;
   return {
     back: [bodyNodes(c), blobNodes(c)],
-    face: [el('g', anim(c, em ? undefined : `aiav-look 7s ease-in-out ${c.delay} infinite`), eyeNodes(c), partNodes(c, 'face'), pieceNodes(c, 'face'))],
+    face: [el('g', anim(c, em ? em.gaze : `aiav-look 7s ease-in-out ${c.delay} infinite`), eyeNodes(c), partNodes(c, 'face'), pieceNodes(c, 'face'))],
     front: [pieceNodes(c, 'neck'), pieceNodes(c, 'head'), partNodes(c, 'fx')],
   };
 }

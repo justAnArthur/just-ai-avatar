@@ -73,6 +73,8 @@ export function layout(input: AvatarOptions = {}): Layout {
         {
           ink: glow ? o.colors.eyeMid : ok(paint.ink),
           mouth: glow ? o.colors.eyeLine : ok(paint.mouth),
+          // light ink vanishes on the glow body's white rim, so tools take the deep tie color there
+          tool: glow ? ok(paint.roles.tie) : ok(paint.ink),
           s,
           face: { x: fx, y: fy },
           eyes: eyeBoxes,

@@ -5,9 +5,14 @@ import { rngFromSeed } from './options.ts';
 export const EMOTIONS = [
   'happy', 'laugh', 'love', 'wink', 'surprised', 'scared',
   'sad', 'crying', 'angry', 'sleepy', 'dizzy', 'thinking',
+  // what an agent is doing rather than feeling; hold one with `emote(name, Infinity)` while the work runs
+  'searching', 'listening', 'speaking', 'typing', 'processing',
 ] as const;
 
 export type EmotionName = (typeof EMOTIONS)[number];
+
+/** The emotions that show work in progress. */
+export const AGENT_STATES = ['searching', 'listening', 'speaking', 'typing', 'processing'] as const satisfies readonly EmotionName[];
 
 /** App-event names: `emote('error')`, `emote('success')`. */
 export const EMOTION_ALIASES = {
@@ -22,6 +27,11 @@ export const EMOTION_ALIASES = {
   confused: 'dizzy',
   loading: 'thinking', wait: 'thinking', hmm: 'thinking',
   shock: 'surprised', wow: 'surprised',
+  search: 'searching', browse: 'searching', lookup: 'searching', find: 'searching',
+  listen: 'listening', voice: 'listening', recording: 'listening',
+  speak: 'speaking', talk: 'speaking', answer: 'speaking', reply: 'speaking',
+  type: 'typing', write: 'typing', writing: 'typing', compose: 'typing',
+  process: 'processing', working: 'processing', busy: 'processing', generating: 'processing',
 } as const satisfies Record<string, EmotionName>;
 
 export type EmotionInput = EmotionName | keyof typeof EMOTION_ALIASES;
@@ -36,6 +46,7 @@ export function emotionName(input: string | null | undefined): EmotionName | nul
 export const EMOTION_DURATION: Record<EmotionName, number> = {
   happy: 2200, laugh: 2600, love: 2800, wink: 1600, surprised: 2000, scared: 2800,
   sad: 3000, crying: 3400, angry: 2600, sleepy: 4000, dizzy: 3000, thinking: 3200,
+  searching: 4800, listening: 3600, speaking: 3200, typing: 3600, processing: 3600,
 };
 
 export type EyeMod = {
@@ -75,6 +86,8 @@ export type EmotionFrame = {
   blobs: Blob[];
   /** CSS animation of the whole avatar. */
   motion?: string;
+  /** CSS animation of the eyes and face parts, in place of looking around. */
+  gaze?: string;
 };
 
 export type EmotionContext = {
@@ -82,6 +95,8 @@ export type EmotionContext = {
   ink: string;
   /** Inside of an open mouth. */
   mouth: string;
+  /** Props like the magnifier, sound waves and loaders; `ink` by default. */
+  tool?: string;
   s: number;
   face: { x: number; y: number };
   eyes: [EyeBox, EyeBox];
@@ -109,6 +124,14 @@ const SHAPES = {
   arcDown: 'M-0.55-0.15Q0 0.6 0.55-0.15',
   chevronL: 'M-0.4-0.45L0.4 0L-0.4 0.45',
   chevronR: 'M0.4-0.45L-0.4 0L0.4 0.45',
+  lens: 'M-0.7-0.15A0.55 0.55 0 1 1 0.4-0.15A0.55 0.55 0 1 1-0.7-0.15Z',
+  magnifier: 'M-0.7-0.15A0.55 0.55 0 1 1 0.4-0.15A0.55 0.55 0 1 1-0.7-0.15ZM0.27 0.27L0.85 0.85',
+  ring: 'M-1 0A1 1 0 1 1 1 0A1 1 0 1 1-1 0Z',
+  arc: 'M0-1A1 1 0 1 1-1 0',
+  wave: 'M-0.2-0.7Q0.35 0-0.2 0.7',
+  bar: 'M0-0.5V0.5',
+  bubbleR: 'M-0.7-0.6H0.7Q1-0.6 1-0.3V0.3Q1 0.6 0.7 0.6H-0.3L-0.8 0.95L-0.62 0.6H-0.7Q-1 0.6-1 0.3V-0.3Q-1-0.6-0.7-0.6Z',
+  bubbleL: 'M0.7-0.6H-0.7Q-1-0.6-1-0.3V0.3Q-1 0.6-0.7 0.6H0.3L0.8 0.95L0.62 0.6H0.7Q1 0.6 1 0.3V-0.3Q1-0.6 0.7-0.6Z',
 } as const;
 
 function starPath(points: number, outer: number, inner: number): string {
@@ -141,11 +164,15 @@ const HEART = '#ff5c8a';
 const TEAR = '#9fe2ff';
 const ANGER = '#ff4d4d';
 const GOLD = '#ffd84d';
+const GLASS = 'rgb(255 255 255 / .35)';
+const BUBBLE = 'rgb(255 255 255 / .94)';
+const TYPING = '#4b5563';
 
 type Build = (k: Kit) => Omit<EmotionFrame, 'name' | 'variant'>;
 
 function kit(ctx: EmotionContext) {
   const { ink, mouth: mouthFill, s, face, eyes, tilt, rnd } = ctx;
+  const tool = ctx.tool ?? ink;
   const stroke = 3.4 * s;
   const side = rnd() < 0.5 ? -1 : 1;
 
@@ -169,7 +196,7 @@ function kit(ctx: EmotionContext) {
   const head = { x: face.x, y: Math.max(9, face.y - 30 * s) };
   const outer = (i: 0 | 1) => eyes[i].cx + (i ? 1 : -1) * eyes[i].w * 0.75;
 
-  return { mouthFill, s, eyes, face, rnd, side, ink, stroke, eyeStroke, mouth, icon, head, outer, mouthY };
+  return { mouthFill, s, eyes, face, rnd, side, ink, tool, stroke, eyeStroke, mouth, icon, head, outer, mouthY };
 }
 
 type Kit = ReturnType<typeof kit>;
@@ -397,6 +424,132 @@ const VARIANTS: Record<EmotionName, Build[]> = {
       blobs: [],
     }),
   ],
+  searching: [
+    // a magnifier sweeps a figure eight across the face and the eyes follow it
+    (k) => {
+      const origin: [number, number] = [k.face.x, k.face.y];
+      const at = { x: k.face.x, y: k.face.y, scale: 24 * k.s };
+      const sweep = 'aiav-pop .35s cubic-bezier(.3,1.6,.5,1) both, aiav-sweep 2.4s .35s ease-in-out infinite';
+      return {
+        eyes: [{ scale: [1.08, 1.08] }, { scale: [1.08, 1.08] }],
+        parts: [
+          { layer: 'fx', d: SHAPES.lens, fill: GLASS, at, origin, anim: sweep },
+          { layer: 'fx', d: SHAPES.magnifier, stroke: k.tool, width: 0.13, at, origin, anim: sweep },
+        ],
+        blobs: [],
+        gaze: 'aiav-g-scan 2.4s .35s ease-in-out infinite',
+      };
+    },
+    // sonar: rings ping out from the face while the eyes scan for a blip
+    (k) => ({
+      eyes: [{ scale: [0.9, 1.05] }, { scale: [0.9, 1.05] }],
+      parts: [
+        ...[0, 1, 2].map((n): Part => ({
+          layer: 'fx', d: SHAPES.ring, stroke: k.tool, width: 0.035, at: { x: k.face.x, y: k.face.y, scale: 30 * k.s },
+          anim: `aiav-ping 2.1s ${n * 0.7}s ease-out infinite`,
+        })),
+        k.icon(SHAPES.dot, k.face.x + k.side * 22 * k.s, k.head.y + 4, 2, { stroke: GOLD, width: 1.6, anim: 'aiav-blip 2.1s 1s ease-out infinite' }),
+      ],
+      blobs: [],
+      gaze: 'aiav-g-scan 2.1s ease-in-out infinite',
+    }),
+  ],
+  listening: [
+    // sound waves roll in on both sides; the eyes open up and the head leans in
+    (k) => ({
+      eyes: [{ scale: [1.06, 1.1] }, { scale: [1.06, 1.1] }],
+      parts: [
+        k.mouth(smile, 6 * k.s),
+        ...([0, 1] as const).flatMap((i) => [0, 1, 2].map((n): Part => {
+          const out = i ? 1 : -1;
+          return {
+            layer: 'fx', d: SHAPES.wave, stroke: k.tool, width: 0.16,
+            at: { x: k.outer(i) + out * (5 + n * 4.5) * k.s, y: k.eyes[i].cy, scale: (7 + n * 3.5) * k.s, rotate: i ? 0 : 180 },
+            anim: `aiav-wave 1.2s ${(2 - n) * 0.15}s ease-in-out infinite`,
+          };
+        })),
+      ],
+      blobs: [],
+      motion: 'aiav-m-lean 2.4s ease-in-out infinite',
+    }),
+    // one ear turned to the sound, the eyes half closed to concentrate
+    (k) => ({
+      eyes: [{ scale: [1.05, 0.7], offset: [k.side * 1.5 * k.s, 0] }, { scale: [1.05, 0.7], offset: [k.side * 1.5 * k.s, 0] }],
+      parts: [0, 1, 2].map((n): Part => {
+        const i = (k.side > 0 ? 1 : 0) as 0 | 1;
+        return {
+          layer: 'fx', d: SHAPES.wave, stroke: k.tool, width: 0.16,
+          at: { x: k.outer(i) + k.side * (6 + n * 5) * k.s, y: k.eyes[i].cy - 2 * k.s, scale: (7 + n * 4) * k.s, rotate: i ? 0 : 180 },
+          anim: `aiav-wave 1s ${(2 - n) * 0.18}s ease-in-out infinite`,
+        };
+      }),
+      blobs: [],
+      motion: 'aiav-m-tilt 1.2s ease-in-out both',
+    }),
+  ],
+  speaking: [
+    // the mouth opens and closes with the words
+    (k) => ({
+      eyes: [{ scale: [1, 0.9] }, { scale: [1, 0.9] }],
+      parts: [k.mouth(oMouth, 9 * k.s, { fill: k.mouthFill, anim: 'aiav-pop .3s both, aiav-talk .3s .3s ease-in-out infinite alternate' })],
+      blobs: [],
+      motion: 'aiav-m-giggle .6s ease-in-out infinite',
+    }),
+    // a voice equalizer for a mouth
+    (k) => ({
+      eyes: [{ scale: [1.02, 0.85] }, { scale: [1.02, 0.85] }],
+      parts: [-2, -1, 0, 1, 2].map((n): Part => ({
+        layer: 'face', d: SHAPES.bar, stroke: k.ink, width: 0.3,
+        at: { x: k.face.x + n * 3.8 * k.s, y: k.mouthY + 1, scale: 9 * k.s, rotate: 0 },
+        anim: `aiav-pop .3s ${Math.abs(n) * 0.04}s both, aiav-eq ${0.38 + Math.abs(n) * 0.07}s ${0.3 + ((n + 2) % 3) * 0.09}s ease-in-out infinite alternate`,
+      })),
+      blobs: [],
+    }),
+  ],
+  typing: [
+    // eyes down on the keyboard, a typing bubble at the side
+    (k) => {
+      const x = k.face.x + k.side * 24 * k.s;
+      const y = k.head.y + 3;
+      return {
+        eyes: [{ scale: [1, 0.78], offset: [0, 2.2 * k.s] }, { scale: [1, 0.78], offset: [0, 2.2 * k.s] }],
+        parts: [
+          k.icon(k.side > 0 ? SHAPES.bubbleR : SHAPES.bubbleL, x, y, 8, { fill: BUBBLE }),
+          ...[-1, 0, 1].map((n) => k.icon(SHAPES.dot, x + n * 4.2 * k.s, y, 2, { stroke: TYPING, width: 1.3, anim: `aiav-pop .3s .1s both, aiav-type 1s ${0.4 + (n + 1) * 0.16}s ease-in-out infinite` })),
+        ],
+        blobs: [],
+        motion: 'aiav-m-nod .5s ease-in-out infinite',
+      };
+    },
+  ],
+  processing: [
+    // a loader ring turns around the face while the eyes focus
+    (k) => ({
+      eyes: [{ scale: [0.85, 0.85] }, { scale: [0.85, 0.85] }],
+      parts: [
+        { layer: 'fx', d: SHAPES.ring, stroke: k.tool, width: 0.05, opacity: 0.25, at: { x: k.face.x, y: k.face.y, scale: 23 * k.s }, anim: 'aiav-fade .3s both' },
+        { layer: 'fx', d: SHAPES.arc, stroke: k.tool, width: 0.05, at: { x: k.face.x, y: k.face.y, scale: 23 * k.s }, origin: [k.face.x, k.face.y], anim: 'aiav-fade .3s both, aiav-spin .9s linear infinite' },
+      ],
+      blobs: [],
+      motion: 'aiav-m-pulse 1.8s ease-in-out infinite',
+    }),
+    // three dots chase each other over the head, the eyes follow them
+    (k) => {
+      const cx = k.face.x;
+      const cy = k.head.y + 3;
+      return {
+        eyes: [{ offset: [0, -2 * k.s] }, { offset: [0, -2 * k.s] }],
+        parts: [0, 1, 2].map((n): Part => {
+          const a = -Math.PI / 2 + n * 0.55;
+          return k.icon(SHAPES.dot, cx + Math.cos(a) * 13 * k.s, cy + Math.sin(a) * 5 * k.s, 2.4 - n * 0.4, {
+            stroke: k.tool, width: 2.4, origin: [cx, cy], anim: `aiav-orbit 1s ${-n * 0.09}s cubic-bezier(.5,.1,.5,.9) infinite`,
+          });
+        }),
+        blobs: [],
+        gaze: 'aiav-g-circle 1s linear infinite',
+      };
+    },
+  ],
 };
 
 function blush(k: Kit): Blob[] {
@@ -467,7 +620,18 @@ export const EMOTION_KEYFRAMES =
   '@keyframes aiav-m-sob{0%,100%{transform:translateY(0)}50%{transform:translateY(1.2%)}}' +
   '@keyframes aiav-m-breathe{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(1%) scaleY(.985)}}' +
   '@keyframes aiav-m-sway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}' +
-  '@keyframes aiav-m-tilt{0%{transform:rotate(0)}30%,80%{transform:rotate(-5deg)}100%{transform:rotate(-5deg)}}';
+  '@keyframes aiav-m-tilt{0%{transform:rotate(0)}30%,80%{transform:rotate(-5deg)}100%{transform:rotate(-5deg)}}' +
+  '@keyframes aiav-sweep{0%,100%{transform:translate(-9px,1px) rotate(-8deg)}25%{transform:translate(0,-3px) rotate(0)}50%{transform:translate(9px,1px) rotate(8deg)}75%{transform:translate(0,3px) rotate(0)}}' +
+  '@keyframes aiav-ping{0%{transform:scale(.25);opacity:0}15%{opacity:.9}100%{transform:scale(1.25);opacity:0}}' +
+  '@keyframes aiav-blip{0%,45%{transform:scale(0);opacity:0}55%{transform:scale(1.4);opacity:1}100%{transform:scale(.8);opacity:0}}' +
+  '@keyframes aiav-wave{0%,100%{opacity:.15;transform:scale(.85)}50%{opacity:1;transform:scale(1)}}' +
+  '@keyframes aiav-talk{from{transform:scaleY(.3)}to{transform:scaleY(1)}}' +
+  '@keyframes aiav-eq{from{transform:scaleY(.25)}to{transform:scaleY(1.15)}}' +
+  '@keyframes aiav-type{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-1.2px);opacity:1}}' +
+  '@keyframes aiav-g-scan{0%,100%{transform:translate(-3%,.3%)}25%{transform:translate(0,-1%)}50%{transform:translate(3%,.3%)}75%{transform:translate(0,1%)}}' +
+  '@keyframes aiav-g-circle{0%{transform:translate(0,-1.5%)}25%{transform:translate(1.5%,0)}50%{transform:translate(0,1%)}75%{transform:translate(-1.5%,0)}100%{transform:translate(0,-1.5%)}}' +
+  '@keyframes aiav-m-lean{0%,100%{transform:rotate(0) translateY(0)}50%{transform:rotate(3deg) translateY(-1%)}}' +
+  '@keyframes aiav-m-nod{0%,100%{transform:translateY(0)}50%{transform:translateY(.8%)}}';
 
 // extends half a box past every edge so the eye's outline and glow survive the clip
 export function cutPolygon(cut: number | undefined, left: boolean): [number, number][] {

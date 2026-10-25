@@ -85,7 +85,7 @@ until everything fits, centered, so `tile="none"` gives a free-standing characte
 An avatar is either calm or feeling something. Calm avatars blink, float and look around; an emotion
 replaces that idle life with its own motion until it ends. `animate={false}` renders a still image.
 
-Twelve animated emotions: `happy` `laugh` `love` `wink` `surprised` `scared` `sad` `crying` `angry` `sleepy`
+Twelve animated emotions, plus five agent states (below): `happy` `laugh` `love` `wink` `surprised` `scared` `sad` `crying` `angry` `sleepy`
 `dizzy` `thinking`. Eyes morph (squash, slant, close, turn into hearts, X's, spirals), a mouth appears, and
 extras pop in (tears, sweat drops, hearts, Zzz, anger vein, stars, "!" and "?"). Each emotion has a few
 variants and **the seed picks one**, so two avatars never look scared in quite the same way, while one avatar
@@ -93,6 +93,29 @@ always does it the same way.
 
 Aliases for app events: `error`/`fear`/`warning` → scared, `success`/`done` → happy, `loading`/`wait` →
 thinking, `fail` → sad, `idle` → sleepy, `confused` → dizzy, and more (`EMOTION_ALIASES`).
+
+### Agent states
+
+Five more show what an agent is doing rather than how it feels. Hold one while the work runs, then let it go:
+
+| State | Animation |
+|---|---|
+| `searching` | a magnifier sweeps a figure eight across the face and the eyes follow it; or sonar rings with a blip |
+| `listening` | sound waves roll in on both sides while the head leans in; or one ear turned to the sound |
+| `speaking` | the mouth opens and closes with the words; or a voice equalizer for a mouth |
+| `typing` | eyes down on the keyboard and a typing bubble with bouncing dots |
+| `processing` | a loader ring turns around the face; or three dots chase each other over the head |
+
+```ts
+mood.emote('searching', Infinity);   // also: search, browse, find
+const hits = await search(query);
+mood.emote('typing', Infinity);      // also: write, compose
+await stream(answer);
+mood.emote('success');               // a happy beat, then calm
+```
+
+`AGENT_STATES` lists them. Aliases: `search` `browse` `lookup` `find`, `listen` `voice` `recording`, `speak` `talk`
+`answer` `reply`, `type` `write` `writing` `compose`, `process` `working` `busy` `generating`.
 
 Preact:
 

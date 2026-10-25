@@ -2,7 +2,7 @@ export { ACCESSORIES, FACE_ACCESSORIES, HEAD_ACCESSORIES, NECK_ACCESSORIES, type
 export { Avatar, KEYFRAMES, type AvatarProps } from './Avatar.tsx';
 export { PALETTES, colorsFromHue, paletteColors, type Colors, type PaletteName } from './colors.ts';
 export {
-  EMOTIONS, EMOTION_ALIASES, EMOTION_DURATION, buildEmotion, emotionName, variantCount,
+  AGENT_STATES, EMOTIONS, EMOTION_ALIASES, EMOTION_DURATION, buildEmotion, emotionName, variantCount,
   type EmotionFrame, type EmotionInput, type EmotionName,
 } from './emotions.ts';
 export { layout, type Layout } from './layout.ts';
