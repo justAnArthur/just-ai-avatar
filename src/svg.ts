@@ -101,7 +101,7 @@ export function renderAvatarSVG(options: AvatarOptions = {}, svgOptions: SvgOpti
     defs.push(blurFilter(`${id}-blob${i}`, bl.blur));
     return `<ellipse cx="${n(bl.x)}" cy="${n(bl.y)}" rx="${n(bl.w / 2)}" ry="${n(bl.h / 2)}" ${paint('fill', bl.color)} filter="url(#${id}-blob${i})"/>`;
   });
-  const accessories = [...accessoryNodes(L, 'face', { id: `${id}-f` }), ...accessoryNodes(L, 'head', { id: `${id}-h` })].map(toMarkup).join('');
+  const accessories = [...accessoryNodes(L, 'neck', { id: `${id}-n` }), ...accessoryNodes(L, 'face', { id: `${id}-f` }), ...accessoryNodes(L, 'head', { id: `${id}-h` })].map(toMarkup).join('');
   let overlay = '';
   if (em?.parts.length || accessories) {
     const { hex, alpha } = toHex(c.eyeGlow);

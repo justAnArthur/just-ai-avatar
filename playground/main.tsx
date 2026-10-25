@@ -8,12 +8,14 @@ import {
   BODIES,
   type BodyName,
   DEFAULTS,
+  AGENT_STATES,
   EMOTIONS,
   type EmotionHandle,
   EYES,
   EYE_PAIRS,
   FACE_ACCESSORIES,
   HEAD_ACCESSORIES,
+  NECK_ACCESSORIES,
   LOOKS,
   type LookName,
   PALETTES,
@@ -67,6 +69,10 @@ const ATTR: Record<string, string> = { eyeScale: 'eye-scale', gazeX: 'gaze-x', g
 function randomSeed() {
   return `${WORDS[Math.floor(Math.random() * WORDS.length)]}-${Math.floor(Math.random() * 1000)}`;
 }
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const RUN: [(typeof AGENT_STATES)[number], number][] = [['listening', 1800], ['searching', 2600], ['processing', 1800], ['typing', 1800], ['speaking', 2200]];
 
 function failingRequest() {
   return new Promise((_, reject) => setTimeout(() => reject(new Error('503 Service Unavailable')), 1200));
@@ -165,7 +171,20 @@ const AccessoryPicker = ({ state, slot, set }: { state: State; slot: AccessoryNa
 const MoodCard = ({ mood, animate, onAnimate }: { mood: ReturnType<typeof useEmotion>; animate: boolean; onAnimate: () => void }) => {
   const [hold, setHold] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  const [running, setRunning] = useState(false);
   const current = emotionName(mood.emotion);
+  const feelings = EMOTIONS.filter((e) => !(AGENT_STATES as readonly string[]).includes(e));
+  const isState = (AGENT_STATES as readonly string[]).includes(current ?? '');
+
+  const runAgent = async () => {
+    setRunning(true);
+    for (const [state, ms] of RUN) {
+      mood.emote(state, Infinity);
+      await sleep(ms);
+    }
+    mood.emote('success');
+    setRunning(false);
+  };
 
   const simulate = async () => {
     setRequesting(true);
@@ -180,7 +199,7 @@ const MoodCard = ({ mood, animate, onAnimate }: { mood: ReturnType<typeof useEmo
 
   return (
     <Card
-      caption={current ? `Feeling ${current} · each seed shows it its own way` : 'Calm · blinking, floating, looking around'}
+      caption={current ? `${isState ? 'Busy' : 'Feeling'} ${current} · each seed shows it its own way` : 'Calm · blinking, floating, looking around'}
       action={
         <div class="flex items-center gap-4">
           <Switch label="Animate" checked={animate} onToggle={onAnimate} size="compact" />
@@ -191,15 +210,26 @@ const MoodCard = ({ mood, animate, onAnimate }: { mood: ReturnType<typeof useEmo
       <div class="flex flex-col gap-3 p-3">
         <div class="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-1.5">
           <Button size="compact" variant={current ? 'secondary' : 'primary'} onClick={mood.calm}>calm</Button>
-          {EMOTIONS.map((e) => (
+          {feelings.map((e) => (
             <Button key={e} size="compact" variant={current === e ? 'primary' : 'secondary'} onClick={() => mood.emote(e, hold ? Infinity : undefined)}>
+              {e}
+            </Button>
+          ))}
+        </div>
+        <span class="text-[13px] text-muted-foreground">Agent states, held until calm</span>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-1.5">
+          {AGENT_STATES.map((e) => (
+            <Button key={e} size="compact" variant={current === e ? 'primary' : 'secondary'} onClick={() => mood.emote(e, Infinity)}>
               {e}
             </Button>
           ))}
         </div>
         <div class="flex flex-wrap items-center justify-between gap-2 text-[13px] text-muted-foreground">
           <span>From your app: <code class="text-foreground">mood.emote('error')</code></span>
-          <Button size="compact" variant="ghost" loading={requesting} onClick={simulate}>Simulate a failed request</Button>
+          <div class="flex gap-1.5">
+            <Button size="compact" variant="ghost" loading={running} onClick={runAgent}>Simulate an agent run</Button>
+            <Button size="compact" variant="ghost" loading={requesting} onClick={simulate}>Simulate a failed request</Button>
+          </div>
         </div>
       </div>
     </Card>
@@ -332,6 +362,10 @@ const CustomizeCard = ({ state, set }: { state: State; set: (patch: Partial<Stat
 
         <Section title="Face" value={state.accessories.find((a) => FACE_ACCESSORIES.includes(a)) ?? 'none'}>
           <AccessoryPicker state={state} slot={FACE_ACCESSORIES} set={set} />
+        </Section>
+
+        <Section title="Neck" value={state.accessories.find((a) => NECK_ACCESSORIES.includes(a)) ?? 'none'}>
+          <AccessoryPicker state={state} slot={NECK_ACCESSORIES} set={set} />
         </Section>
 
         <Section title="Accessory color" value={state.accentHue == null ? 'auto' : `hue ${state.accentHue}`}>

@@ -10,8 +10,10 @@ export type Shape =
   | { lobes: [number, number, number][] };
 
 export type BodyDef = {
-  /** % of the tile; must overflow it so the tile crops the body. */
+  /** % of the tile; must overflow it so the tile crops the body, unless the body is `whole`. */
   box: Box;
+  /** Drawn whole inside the tile instead of cropped by it; it shrinks to make room for hats and ties. */
+  whole?: boolean;
   shape: Shape;
   /** Glow center and size in % of the body box. */
   core: { cx: number; cy: number; w: number; h: number; shape?: Shape };
@@ -105,6 +107,14 @@ export const BODIES = {
     core: { cx: 50, cy: 45, w: 76, h: 62 },
     face: { x: 53.2, y: 32.6 },
     scale: 0.95,
+  },
+  orb: {
+    box: { x: 16, y: 16, w: 68, h: 68 },
+    whole: true,
+    shape: { radius: '50%' },
+    core: { cx: 50, cy: 46, w: 74, h: 66 },
+    face: { x: 52, y: 44 },
+    scale: 0.72,
   },
 } satisfies Record<string, BodyDef>;
 

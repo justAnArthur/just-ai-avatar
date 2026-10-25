@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { EMOTIONS, EMOTION_ALIASES, emotionName, layout, renderAvatarSVG, variantCount } from '../src/index.ts';
+import { AGENT_STATES, EMOTIONS, EMOTION_ALIASES, emotionName, layout, renderAvatarSVG, variantCount } from '../src/index.ts';
+import { ok } from '../src/looks.ts';
 import { renderAvatarHTML } from '../src/server.ts';
 
 describe('emotions', () => {
@@ -7,6 +8,29 @@ describe('emotions', () => {
     for (const [alias, name] of Object.entries(EMOTION_ALIASES)) expect(emotionName(alias)).toBe(name);
     expect(emotionName('error')).toBe('scared');
     expect(emotionName('nope')).toBeNull();
+  });
+
+  test('agent states are emotions with their own aliases', () => {
+    for (const state of AGENT_STATES) expect(EMOTIONS).toContain(state);
+    expect(emotionName('search')).toBe('searching');
+    expect(emotionName('talk')).toBe('speaking');
+    expect(emotionName('generating')).toBe('processing');
+    expect(emotionName('loading')).toBe('thinking');
+  });
+
+  test('a gaze replaces looking around, in both renderers', () => {
+    for (const look of ['glow', 'flat'] as const) {
+      const html = renderAvatarHTML({ look, emotion: 'searching', emotionVariant: 0 });
+      expect(html).toContain('aiav-g-scan 2.4s');
+      expect(html).toContain('aiav-sweep 2.4s');
+      expect(html).not.toContain('aiav-look 7s');
+    }
+  });
+
+  test('tools take the deep tie color in glow, where light ink would vanish', () => {
+    const glow = layout({ emotion: 'searching', emotionVariant: 0 });
+    const magnifier = glow.emotion!.parts.find((p) => p.stroke)!;
+    expect(magnifier.stroke).toBe(ok(glow.paint.roles.tie));
   });
 
   test('the same seed always feels the same way', () => {

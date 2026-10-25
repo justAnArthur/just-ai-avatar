@@ -9,7 +9,7 @@ export type AvatarOptions = {
   seed?: string;
   /** Rendering: `glow`, `flat`, `plush` or `clay`. Accessories and emotions follow it. */
   look?: LookName;
-  /** One per slot (head, face); the later wins, `[]` for none. */
+  /** One per slot (head, face, neck); the later wins, `[]` for none. */
   accessories?: AccessoryName | AccessoryName[];
   /** OKLCH hue of the accessories; complements the body by default. */
   accentHue?: number | null;
@@ -67,6 +67,8 @@ export type Resolved = Required<Omit<AvatarOptions, 'seed' | 'eyes' | 'hue' | 'a
   /** The hue every look derives from, also with a palette. */
   baseHue: number;
   accentHue: number;
+  /** The accent when one is set, the body hue otherwise. */
+  tieHue: number;
   accessories: AccessoryName[];
   eyes: [EyeName, EyeName];
   emotion?: EmotionInput | null;
@@ -140,6 +142,7 @@ export function resolve(input: AvatarOptions = {}): Resolved {
     eyes,
     baseHue,
     accentHue: o.accentHue ?? (baseHue + 160) % 360,
+    tieHue: o.accentHue ?? baseHue,
     accessories: pickAccessories(o.accessories),
     seedKey: given.seed ?? [o.hue ?? o.palette, o.body, eyes.join('+'), o.tilt, o.spacing].join('|'),
   };
